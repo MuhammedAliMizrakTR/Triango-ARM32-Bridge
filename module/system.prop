@@ -1,0 +1,11 @@
+# Triango ARM32 Bridge — optional system properties.
+#
+# WARNING (v0.1): the lines below are DISABLED on purpose. Advertising
+# armeabi-v7a via ro.product.cpu.abilist32 lets the PackageManager *install*
+# arm32 APKs, but app-level execution additionally needs zygote32 + an ART
+# translation layer (roadmap v0.3). Enabling them early will produce installs
+# that crash at launch. Enable only for experiments.
+#
+# ro.product.cpu.abilist=arm64-v8a,armeabi-v7a,armeabi
+# ro.product.cpu.abilist32=armeabi-v7a,armeabi
+# ro.product.cpu.abilist64=arm64-v8a
