@@ -73,8 +73,8 @@ jobs:
       - name: Host tests - engine
         run: |
           make -C nativebridge engine-test > out.log 2>&1 || {
-            echo "::error::engine-test failed; output follows:"
-            tail -40 out.log | while IFS= read -r l; do echo "::error::$l"; done
+            echo "::error::engine-test failed; tail -8:"
+            tail -8 out.log | while IFS= read -r l; do echo "::error::$l"; done
             exit 1
           }
           tail -2 out.log
