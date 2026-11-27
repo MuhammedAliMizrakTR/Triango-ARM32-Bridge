@@ -7,7 +7,7 @@
 SKIPUNZIP=0
 TRI=/data/adb/triango
 
-ui_print "- Triango ARM32 Bridge v1.1.0-a"
+ui_print "- Triango ARM32 Bridge v1.2.1-b"
 ui_print "- staging state under /data/adb/triango"
 
 mkdir -p "$TRI/lib" "$TRI/log" "$TRI/config" "$TRI/engines" "$TRI/sysroot32"
