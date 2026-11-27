@@ -50,6 +50,17 @@ if [ ! -f "$TRI/config/disable_nativebridge" ]; then
 		fi
 	done
 
+	# Stage the interpreter engine plug-in (V1.1(a)) alongside the bridge.
+	for f in "$MODDIR/libtriango_nb_engine.so" \
+		"$MODDIR/system/lib64/libtriango_nb_engine.so"; do
+		if [ -f "$f" ]; then
+			cp -f "$f" "$TRI/lib/libtriango_nb_engine.so" 2>/dev/null
+			chmod 644 "$TRI/lib/libtriango_nb_engine.so" 2>/dev/null
+			log "engine plug-in staged"
+			break
+		fi
+	done
+
 	# Allow zygote's linker namespace to dlopen from /data/adb/triango/lib.
 	# /linkerconfig is regenerated at boot; patching in post-fs-data lands
 	# before zygote starts.  Idempotent: skip if already patched.

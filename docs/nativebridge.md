@@ -84,20 +84,60 @@ Kapatma: `/data/adb/triango/config/disable_nativebridge` (abilist için:
 - **Günlük:** nativebridge.log + gpud.log canlı görüntüleme
 - **TR/EN** dil değiştirici; `ksu.exec` köprüsü savunmacı (WebUI-X uyumlu)
 
-## 6. Bilinen sınırlar / Roadmap
+## 6. Motor eklentisi — V1.1(a) (`libtriango_nb_engine.so`)
+
+`nativebridge/engine/` içindeki yorumlayıcı motor, `nb_engine.h` ABI'sini
+gerçekler: `load_library` (ELF32 EM_ARM `.so` yükleyici), `get_trampoline`
+(host'tan çağrılabilir giriş noktası), `unload_library`, `get_error`.
+
+- **Yorumlayıcı:** ARM + Thumb-2 tam sayı alt kümesi (DP, LDR/STR ailesi,
+  LDM/STM, MUL/MLA/MLS/UMLAL, UDIV/SDIV, MOVW/MOVT, bitfield, B/BL/BLX,
+  CBZ, TBB/TBH …). Her host iş parçacığına bir CPU — çok çekirdekli
+  çağrılar güvenli.
+- **libc shim'leri (native hız):** memcpy/memmove/memset/strlen/strcmp/
+  strncmp/strcpy/strncpy/strcat/strchr/malloc/calloc/realloc/free/abort/
+  puts/abs + `__aeabi_uidiv/idiv/memcpy*/memclr*/memset/memmove`. Bunlar
+  doğrudan host libc'sinde koşar — "native hız" bu katta zaten var.
+- **Trambolinler:** x86_64 (SysV) ve aarch64 (AAPCS64) için W^X stub'lar;
+  bridge'in `get_trampoline` çağrıları gerçek fonksiyon işaretçisi alır.
+- **Çok modüllü:** bağımlı semboller yüklenmiş modüllerden + shim
+  tablosundan çözülür; çözülemeyen sembol hatası raporlanır.
+
+```bash
+make -C nativebridge engine        # libtriango_nb_engine.so
+make -C nativebridge engine-test   # 30 test (blobs + trambolin [+ TRIANGO_TEST_SO])
+```
+
+### Dürüstlük / honesty (V1.1(a))
+
+| İddia | Gerçek durum |
+|---|---|
+| "arm32 uygulama çalışır" | ✅ yorumlayıcı ile çalışır; 30 otomatik test |
+| "native hız" | ⚠️ libc içe aktarımları native; uygulama kodu yorumlanır. **JIT native hızı sonraki sürüm.** |
+| "tam CPU" | ✅ iş parçacığı başına CPU (çok çekirdekli yorum) |
+| "tam GPU util" | ✅ mevcut gpud dişli yolu (v1.0) |
+| VFP/NEON | ❌ bilinçli boşluk — trap + tanılama (V1.2) |
+| SVC (syscall) | ❌ trap + tanılama (V1.2: shim/syscall köprüsü) |
+| Sinyal çevirisi | 🗺️ henüz NULL (motorla birlikte) |
+
+## 7. Bilinen sınırlar / Roadmap
 
 | Konu | Durum |
 |---|---|
 | Arayüz (v6), gating, motor bağlama, yaşam döngüsü | ✅ gerçek + testli |
-| arm32 kod çevirisi | 🚧 motor eklentisi (qemu → Triango JIT, roadmap v0.3/v0.4) |
+| arm32 kod **çalıştırma** | ✅ V1.1(a) yorumlayıcı (30 test) |
+| arm32 kod **native hız** (JIT) | 🚧 sonraki adım (roadmap) |
+| libc içe aktarımları | ✅ host shim'leri (native hız) |
+| VFP/NEON + SVC | 🗺️ V1.2 |
 | Sinyal çevirisi (getSignalHandler) | 🗺️ motorla birlikte (şimdilik NULL) |
-| JNI trampoline kısa-yolu (shorty) | 🗺️ motor eklentisinde |
+| JNI trampoline kısa-yolu (shorty) | ⚠️ V1.1(a): shorty yok sayılır, 4×u32 marşalling |
 | 32-bit uygulama süreci (zygote32, tam uyumluluk) | 🗺️ alternatif yol: arm32 `app_process32` + binfmt köprüsü |
 
-## 7. Doğrulama
+## 8. Doğrulama
 
 ```bash
 make -C nativebridge test          # host: 43 kontrol
+make -C nativebridge engine-test   # motor: 30 test
 adb shell getprop ro.dalvik.vm.native.bridge
 adb shell ls -l /data/adb/triango/lib/
 adb logcat -s triango              # veya /data/adb/triango/log/nativebridge.log

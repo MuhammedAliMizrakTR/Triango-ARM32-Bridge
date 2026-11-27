@@ -1,7 +1,7 @@
 id=triango_arm32_bridge
 name=Triango ARM32 Bridge
-version=v1.0.0
-versionCode=10000
+version=v1.1.0-a
+versionCode=11000
 author=MuhammedAliMizrakTR
-description=Arm32 (armeabi-v7a) support for 64-bit-only Qualcomm SoCs: NativeBridge (libtriango_native_bridge), GPU thunk layer, NO_MATCHING_ABIS fix. LateLoad-compatible, soft-reboot activation, WebUI. Target: Galaxy S26 Ultra (m3q, SM8850-AC).
+description=Arm32 (armeabi-v7a) support for 64-bit-only Qualcomm SoCs: NativeBridge (libtriango_native_bridge) + interpreter engine (libtriango_nb_engine), GPU thunk layer, NO_MATCHING_ABIS fix. LateLoad-compatible, soft-reboot activation, WebUI. Target: Galaxy S26 Ultra (m3q, SM8850-AC).
 updateJson=

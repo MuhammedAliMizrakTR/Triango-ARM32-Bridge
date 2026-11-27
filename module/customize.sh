@@ -7,7 +7,7 @@
 SKIPUNZIP=0
 TRI=/data/adb/triango
 
-ui_print "- Triango ARM32 Bridge v1.0.0"
+ui_print "- Triango ARM32 Bridge v1.1.0-a"
 ui_print "- staging state under /data/adb/triango"
 
 mkdir -p "$TRI/lib" "$TRI/log" "$TRI/config" "$TRI/engines" "$TRI/sysroot32"
@@ -26,6 +26,21 @@ if [ ! -f "$TRI/lib/libtriango_native_bridge.so" ]; then
 	ui_print "! libtriango_native_bridge.so not in zip"
 	ui_print "! build it: tools/build-nativebridge.sh <ndk>"
 	ui_print "! (activation still fixes ABIs + props)"
+fi
+
+# Stage the interpreter engine plug-in when the zip carries one.
+for f in "$MODPATH/libtriango_nb_engine.so" \
+	"$MODPATH/system/lib64/libtriango_nb_engine.so"; do
+	if [ -f "$f" ]; then
+		cp -f "$f" "$TRI/lib/libtriango_nb_engine.so"
+		chmod 644 "$TRI/lib/libtriango_nb_engine.so"
+		ui_print "- libtriango_nb_engine.so staged (V1.1(a) engine)"
+		break
+	fi
+done
+if [ ! -f "$TRI/lib/libtriango_nb_engine.so" ]; then
+	ui_print "! libtriango_nb_engine.so not in zip"
+	ui_print "! build it: make -C nativebridge engine (or NDK build)"
 fi
 
 ui_print "- done. Activate via the module WebUI (soft reboot) or"

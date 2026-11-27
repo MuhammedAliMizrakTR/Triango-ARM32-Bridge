@@ -119,15 +119,21 @@ Sistem geneli ABI prop'ları (abilist32) modülle otomatik açılır; tek
 kurulumluk geçici çözüm: `tools/pm-install-arm32.sh`. Ayrıntılar:
 [`docs/abi-fix.md`](docs/abi-fix.md).
 
-## NativeBridge modülü v1.0 (WebUI · soft reboot)
+## NativeBridge modülü v1.1(a) (WebUI · soft reboot · motor)
 
-`libtriango_native_bridge.so` (Android NativeBridge v6) + KSU modülü:
-**LateLoad uyumlu**, **soft reboot ile aktive olur** (tam yeniden başlatma
-gerekmez), **KernelSU WebUI** (durum kartları, tek dokunuşla aktivasyon,
-günlük görüntüleyici). Motor eklentisi ABI'si hazır; ayrıntılar:
-[`docs/nativebridge.md`](docs/nativebridge.md).
+`libtriango_native_bridge.so` (Android NativeBridge v6) + **yorumlayıcı motor
+eklentisi** `libtriango_nb_engine.so` + KSU modülü: **LateLoad uyumlu**,
+**soft reboot ile aktive olur** (tam yeniden başlatma gerekmez), **KernelSU
+WebUI** (durum kartları, tek dokunuşla aktivasyon, günlük görüntüleyici).
+Ayrıntılar: [`docs/nativebridge.md`](docs/nativebridge.md).
 
-## Durum / Status (v1.0.0)
+**Dürüstlük notu (V1.1(a)):** motor, arm32 ARM/Thumb-2 komutlarını
+**yorumlayıcı** ile çalıştırır — libc içe aktarımları (memcpy, malloc,
+strlen, __aeabi_*) **host üzerinde native hızda** koşar; uygulama kodu
+çeviri öncesi hızdadır. **Gerçek native hız (JIT)** bir sonraki adımdır.
+VFP/NEON ve SVC çağruları bilinçli boşluklardır (tanılama ile raporlanır).
+
+## Durum / Status (v1.1.0-a)
 
 | Bileşen | Durum |
 |---|---|
@@ -137,9 +143,10 @@ günlük görüntüleyici). Motor eklentisi ABI'si hazır; ayrıntılar:
 | GPU dişli katmanı (thunk üretici + protokol + jeton tablosu + gpud) | ✅ `make -C gpu test` (4098 kontrol) |
 | GPU normal mod (doğrudan arm32 blob geçişi) | ✅ tasarım + sysroot32 yerleşimi hazır |
 | `INSTALL_FAILED_NO_MATCHING_ABIS` çözümü (abilist32) | ✅ modülde (post-fs-data resetprop + system.prop) |
-| NativeBridge (libtriango_native_bridge, v6 arayüz + WebUI + soft reboot) | ✅ v1.0 — motor eklentisi 🗺️ |
-| KernelSU / BakaSU modül paketi (WebUI'li) | ✅ v1.0.0 |
-| Triango JIT motoru (arm32→arm64) | 🚧 iskelet (`docs/roadmap.md`) |
+| NativeBridge (libtriango_native_bridge, v6 arayüz + WebUI + soft reboot) | ✅ v1.1(a) |
+| **Motor eklentisi** (`libtriango_nb_engine.so`: ARM/Thumb-2 yorumlayıcı + ELF32 yükleyici + host trambolin + libc shim'leri) | ✅ V1.1(a) — 30 test |
+| KernelSU / BakaSU modül paketi (WebUI'li) | ✅ v1.1.0-a |
+| Triango JIT motoru (arm32→arm64, native hız) | 🚧 sonraki adım (`docs/roadmap.md`) |
 
 ## Güvenlik / Safety
 

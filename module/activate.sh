@@ -44,6 +44,17 @@ if [ ! -f "$TRI/config/disable_nativebridge" ]; then
 		fi
 	done
 
+	# 1b. Stage the interpreter engine plug-in (V1.1(a)).
+	for f in "$MODDIR/libtriango_nb_engine.so" \
+		"$MODDIR/system/lib64/libtriango_nb_engine.so"; do
+		if [ -f "$f" ]; then
+			cp -f "$f" "$TRI/lib/libtriango_nb_engine.so" 2>/dev/null
+			chmod 644 "$TRI/lib/libtriango_nb_engine.so" 2>/dev/null
+			log "engine plug-in staged"
+			break
+		fi
+	done
+
 	# 2. Linker namespace permission (idempotent).
 	LC=/linkerconfig/ld.config.txt
 	if [ -f "$LC" ] && ! grep -q "data/adb/triango/lib" "$LC" 2>/dev/null; then
