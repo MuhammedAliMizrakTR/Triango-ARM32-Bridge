@@ -12,3 +12,16 @@ allow system_server { adb_data_file }:file { getattr open read };
 
 # gpud accesses /dev/kgsl-3d0 (Adreno) for the GPU thunk daemon.
 allow untrusted_app { gpu_device }:chr_file { getattr open read write ioctl };
+
+# v1.2.1-b: /data/adb/triango/lib/*.so is relabeled system_file (chcon in the
+# module scripts).  zygote dlopens the bridge at startup; apps dlopen arm32
+# libs through it later.  Both need reach + read/map/execute on that label.
+allow zygote { system_file }:dir { getattr search open read };
+allow zygote { system_file }:file { getattr open read map execute };
+allow appdomain { system_file }:dir { getattr search open read };
+allow appdomain { system_file }:file { getattr open read map execute };
+allow system_server { system_file }:file { getattr open read map };
+
+# App processes reach the state dir path components to find the relabeled
+# lib dir beneath it (zygote's adb_data_file rule is above).
+allow appdomain { adb_data_file }:dir { getattr search open read };
