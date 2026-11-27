@@ -467,4 +467,6 @@ void t32_shim_install_builtins(t32_space *sp)
 	t32_shim_install(sp, "__cxa_finalize", sh_nop_ret0);
 	t32_shim_install(sp, "__cxa_atexit", sh_nop_ret0);
 	t32_shim_install(sp, "__gmon_start__", sh_nop_ret0);
+	t32_shim_install(sp, "_ITM_registerTMCloneTable", sh_nop_ret0);
+	t32_shim_install(sp, "_ITM_deregisterTMCloneTable", sh_nop_ret0);
 }
