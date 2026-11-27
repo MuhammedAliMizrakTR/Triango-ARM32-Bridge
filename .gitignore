@@ -1,0 +1,30 @@
+# Build outputs
+build/
+dist/
+*.o
+*.ko
+*.mod
+*.mod.c
+*.cmd
+*.order
+*.symvers
+.tmp_versions/
+Module.symvers
+modules.order
+
+# Bridge host artifacts
+bridge/build/
+*.a
+
+# Packaging
+module/system/bin/
+module/*.zip
+
+# Editor / OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# Local scratch
+scratch/

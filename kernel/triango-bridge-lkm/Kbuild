@@ -1,0 +1,4 @@
+# SPDX-License-Identifier: GPL-2.0-only
+# Composite module: triango_bridge.ko
+obj-m := triango_bridge.o
+triango_bridge-y := triango_binfmt.o

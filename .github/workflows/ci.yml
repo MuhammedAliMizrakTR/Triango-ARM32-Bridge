@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  bridge:
+    name: Bridge unit tests (host)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Unit tests
+        run: make -C bridge test
+      - name: Build bridge binary
+        run: make -C bridge all
+      - name: Selftest
+        run: ./bridge/build/triango-bridge --selftest
+
+  lkm:
+    name: LKM + module package (GKI android16-6.12)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y flex bison libssl-dev bc gcc-aarch64-linux-gnu
+      - name: Cache GKI kernel tree
+        id: cache-kernel
+        uses: actions/cache@v4
+        with:
+          path: kernel-common
+          key: gki-android16-6.12-v1
+      - name: Fetch & prepare GKI kernel tree
+        if: steps.cache-kernel.outputs.cache-hit != 'true'
+        run: |
+          git clone --depth=1 -b android16-6.12 \
+            https://android.googlesource.com/kernel/common kernel-common
+          make -C kernel-common ARCH=arm64 gki_defconfig || make -C kernel-common ARCH=arm64 defconfig
+          make -C kernel-common ARCH=arm64 olddefconfig
+          make -C kernel-common ARCH=arm64 modules_prepare
+      - name: Build triango_bridge.ko
+        run: ./kernel/triango-bridge-lkm/build.sh "$GITHUB_WORKSPACE/kernel-common"
+      - name: Build bridge (aarch64)
+        run: make -C bridge CROSS_COMPILE=aarch64-linux-gnu- all
+      - name: Package KernelSU module zip
+        run: ./tools/package-module.sh
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: triango-arm32-bridge
+          path: |
+            kernel/triango-bridge-lkm/triango_bridge.ko
+            bridge/build/triango-bridge
+            dist/triango-arm32-bridge-ksu.zip

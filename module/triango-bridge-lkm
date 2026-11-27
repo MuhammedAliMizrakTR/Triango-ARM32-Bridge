@@ -1,0 +1,9 @@
+#!/system/bin/sh
+# Triango ARM32 Bridge — argv-convention wrapper.
+#
+# Used as the interpreter for BOTH interception paths:
+#   - triango_bridge.ko (kernel LKM, module param bridge_path points here)
+#   - binfmt_misc fallback registration (with the 'P' flag)
+# Both deliver argv as: [wrapper, target, orig_argv0, orig_args...]
+# which is exactly the bridge's "lkm" convention.
+exec /data/adb/triango/triango-bridge --conv=lkm "$@"

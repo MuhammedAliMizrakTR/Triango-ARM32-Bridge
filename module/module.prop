@@ -1,0 +1,7 @@
+id=triango_arm32_bridge
+name=Triango ARM32 Bridge
+version=v0.1.0
+versionCode=1
+author=MuhammedAliMizrakTR
+description=Regains Arm32 (armeabi-v7a) execution on 64-bit-only Qualcomm SoCs (Snapdragon 8 Elite / 8 Elite Gen 5) via a binfmt interception LKM + AArch64 bridge. Built for KernelSU — BakaSU LKM Jailbreak Mode. Primary target: Galaxy S26 Ultra (m3q, SM8850-AC).
+updateJson=
