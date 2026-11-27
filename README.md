@@ -127,14 +127,14 @@ eklentisi** `libtriango_nb_engine.so` + KSU modülü: **LateLoad uyumlu**,
 WebUI** (durum kartları, tek dokunuşla aktivasyon, günlük görüntüleyici).
 Ayrıntılar: [`docs/nativebridge.md`](docs/nativebridge.md).
 
-**Dürüstlük notu (v1.2.1-b):** motor, arm32 ARM/Thumb-2 komut setini
+**Dürüstlük notu (v1.2.2-b):** motor, arm32 ARM/Thumb-2 komut setini
 **blok JIT** ile yerel hıza çevirir (x64/AArch64 backend); kapsama dışı
 komutlar tek adımlık **yorumlayıcı düşüşü** ile çalışır (semantik tek
 kaynak: yorumlayıcı). VFP/NEON bu sürümde **yorumlayıcı** üzerinden tam
 desteklidir (JIT'e alınması sonraki adımdır). libc shim'leri host üzerinde
 native hızdadır.
 
-## Durum / Status (v1.2.1-b)
+## Durum / Status (v1.2.2-b)
 
 | Bileşen | Durum |
 |---|---|
@@ -146,9 +146,36 @@ native hızdadır.
 | `INSTALL_FAILED_NO_MATCHING_ABIS` çözümü (abilist32) | ✅ kurulum anında + her boot (doğrudan paket yükleyici) |
 | NativeBridge (libtriango_native_bridge, v6 arayüz + WebUI + soft reboot) | ✅ zygote-güvenli (gecikmeli aktivasyon, lazy init) |
 | **Motor eklentisi** (`libtriango_nb_engine.so`: ARM/Thumb-2 **JIT** + yorumlayıcı + VFP/NEON + ELF32 + trambolin + shim'ler) | ✅ 110/110 test (JIT + yorumlayıcı diferansiyel) |
-| KernelSU / BakaSU modül paketi (WebUI'li) | ✅ v1.2.1-b |
+| KernelSU / BakaSU modül paketi (WebUI'li) | ✅ v1.2.2-b |
 | Triango JIT motoru (arm32→yerel blok çevirici) | ✅ v1.2.0-b (x64 + AArch64 backend) |
-| zygote64 soft-reboot çökme düzeltmeleri (izin/etiket/ISA prop/gecikmeli aktivasyon) | ✅ v1.2.1-b hotfix |
+| zygote64 çökme düzeltmeleri (Android 17 kök neden + watchdog/otomatik geri alma) | ✅ v1.2.2-b hotfix |
+
+### Android 17 kök neden analizi (v1.2.2-b — AOSP kaynağıyla doğrulandı)
+
+Kaynak: Android 17 ART ağacı — `libnativebridge/native_bridge.cc`, `runtime/runtime.cc`
+(1:1 inceleyen sürüm: GrapheneOS `platform_art` `17` dalı).
+
+1. **İsim reddi (kesin engel):** `NativeBridgeNameAcceptable()` yalnızca
+   `[a-zA-Z][a-zA-Z0-9._-]*` kabul eder — `/data/...` gibi mutlak yol **dlopen'dan
+   önce reddedilir**; bridge hiç yüklenemez. Artık prop yalnızca saf ad
+   (`libtriango_native_bridge.so`); .so systemless mount ile `/system/lib64`'ten
+   çözülür (modül yükü). Mount yoksa aktivasyon **iptal** — çözülemeyecek prop
+   asla kurulmaz.
+2. **Host ISA reddi (kesin engel):** ART `initialize()`/`getAppEnv()`'e konuk
+   ISA'yı değil **host ISA'yı** geçirir (`GetInstructionSetString(kRuntimeISA)`
+   → `arm64`). Eski katı `armeabi*` kontrolü her uygulama init'ini başarısız
+   kılıyordu. Artık boş olmayan her ISA kabul edilir; konuk ABI denetimi
+   `isSupported()` (ARM ELF kapısı) tarafında yapılır.
+3. **`stop`/`start` kaldırıldı:** modern init'de ana sınıfı aşağıda bırakabilen
+   eski builtins yerine yalnızca hedefli `ctl.restart zygote[+_secondary]`.
+4. **`ld.config.txt` sed yaması kaldırıldı:** Android 17 bölüm-tabanlı formatta
+   eski düz-anahtar deseni sessizce eşleşmiyordu (no-op) — kaldırılarak linker
+   yapılandırma bozulma riski tamamen elimine edildi.
+5. **60 sn zygote watchdog + otomatik geri alma:** zygote64/system_server geri
+   gelmezse tüm prop değişiklikleri geri alınır, `logcat -d`/`dmesg`/`getprop`
+   dökümleri `log/rollback-<ts>/` altına kaydedilir ve `config/safe_mode` açılır
+   — cihaz **asla** zygote'suz kalmaz; loglar çökmeden önce toplanır.
+6. Boot-sayaçlı safe mode (art arda 3 başarısız boot → köprü kalıcı kapalı) korunur.
 
 ## Güvenlik / Safety
 
