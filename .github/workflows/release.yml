@@ -6,6 +6,12 @@ name: Release assets
 on:
   release:
     types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to attach assets to"
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -17,21 +23,46 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install cross toolchains
+      - name: Install build deps
         run: |
           sudo apt-get update
-          sudo apt-get install -y gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi
+          sudo apt-get install -y flex bison libssl-dev bc libelf-dev libdw-dev \
+            pkg-config dwarves python3 gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi
 
-      - name: Restore LKM kernel build cache
+      - name: Cache GKI kernel tree
+        id: cache-kernel
         uses: actions/cache@v4
         with:
-          path: |
-            kernel/.cache/linux-6.12.30
-            kernel/.cache/linux-6.12.30.tar.xz
-          key: lkm-kernel-6.12.30-${{ runner.os }}
+          path: kernel-common
+          key: gki-android16-6.12-v1
 
-      - name: Build KernelSU/BakaSU kernel module (GKI android16-6.12)
-        run: ./kernel/build-lkm.sh
+      - name: Clone GKI kernel tree
+        if: steps.cache-kernel.outputs.cache-hit != 'true'
+        run: |
+          set -e
+          echo "::notice::cloning GKI kernel (AOSP)"
+          if ! git clone --depth=1 -b android16-6.12 \
+              https://android.googlesource.com/kernel/common kernel-common; then
+            echo "::warning::AOSP clone failed; trying GitHub mirror"
+            rm -rf kernel-common
+            git clone --depth=1 -b android16-6.12 \
+              https://github.com/aosp-mirror/kernel_common kernel-common
+          fi
+
+      - name: Configure GKI kernel tree
+        if: steps.cache-kernel.outputs.cache-hit != 'true'
+        run: |
+          make -C kernel-common ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- gki_defconfig \
+            || make -C kernel-common ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- defconfig
+
+      - name: Prepare GKI kernel tree (modules_prepare)
+        if: steps.cache-kernel.outputs.cache-hit != 'true'
+        run: |
+          make -C kernel-common ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- olddefconfig
+          make -C kernel-common ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- modules_prepare
+
+      - name: Build triango_bridge.ko
+        run: ./kernel/triango-bridge-lkm/build.sh "$GITHUB_WORKSPACE/kernel-common"
 
       - name: Build bridge (aarch64)
         run: make -C bridge CROSS_COMPILE=aarch64-linux-gnu- all
@@ -58,8 +89,9 @@ jobs:
       - name: Upload assets to the release
         env:
           GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name || inputs.tag }}
         run: |
-          gh release upload "${{ github.event.release.tag_name }}" \
+          gh release upload "$TAG" \
             dist/triango-arm32-bridge-ksu.zip \
             kernel/triango-bridge-lkm/triango_bridge.ko \
             bridge/build/triango-bridge \
