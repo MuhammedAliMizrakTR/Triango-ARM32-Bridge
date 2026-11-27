@@ -64,12 +64,14 @@ jobs:
       - name: Build triango_bridge.ko
         run: ./kernel/triango-bridge-lkm/build.sh "$GITHUB_WORKSPACE/kernel-common"
 
-      - name: Host tests (sanity, before cross builds pollute build dirs)
-        run: |
-          make -C bridge test
-          make -C gpu test
-          make -C nativebridge test
-          make -C nativebridge engine-test
+      - name: Host tests - bridge
+        run: make -C bridge test
+      - name: Host tests - gpu
+        run: make -C gpu test
+      - name: Host tests - nativebridge
+        run: make -C nativebridge test
+      - name: Host tests - engine
+        run: make -C nativebridge engine-test
 
       - name: Build bridge (aarch64)
         run: make -C bridge CROSS_COMPILE=aarch64-linux-gnu- all
