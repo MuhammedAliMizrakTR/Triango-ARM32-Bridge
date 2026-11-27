@@ -34,26 +34,28 @@ jobs:
         with:
           path: kernel-common
           key: gki-android16-6.12-v1
-      - name: Fetch & prepare GKI kernel tree
+      - name: Clone GKI kernel tree
         if: steps.cache-kernel.outputs.cache-hit != 'true'
         run: |
           set -e
-          fetch() {
+          echo "::notice::cloning GKI kernel (AOSP)"
+          if ! git clone --depth=1 -b android16-6.12 \
+              https://android.googlesource.com/kernel/common kernel-common; then
+            echo "::warning::AOSP clone failed; trying GitHub mirror"
             rm -rf kernel-common
-            for i in 1 2 3; do
-              git clone --depth=1 -b android16-6.12 "$1" kernel-common && return 0
-              echo "clone attempt $i of $1 failed; retrying..."
-              sleep 5
-            done
-            return 1
-          }
-          # Primary: AOSP; fallback: GitHub mirror (same branch).
-          fetch https://android.googlesource.com/kernel/common \
-            || fetch https://github.com/aosp-mirror/kernel_common
-          KMAKE="make -C kernel-common ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu-"
-          $KMAKE gki_defconfig || $KMAKE defconfig
-          $KMAKE olddefconfig
-          $KMAKE modules_prepare
+            git clone --depth=1 -b android16-6.12 \
+              https://github.com/aosp-mirror/kernel_common kernel-common
+          fi
+      - name: Configure GKI kernel tree
+        if: steps.cache-kernel.outputs.cache-hit != 'true'
+        run: |
+          make -C kernel-common ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- gki_defconfig \
+            || make -C kernel-common ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- defconfig
+      - name: Prepare GKI kernel tree (modules_prepare)
+        if: steps.cache-kernel.outputs.cache-hit != 'true'
+        run: |
+          make -C kernel-common ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- olddefconfig
+          make -C kernel-common ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- modules_prepare
       - name: Build triango_bridge.ko
         run: ./kernel/triango-bridge-lkm/build.sh "$GITHUB_WORKSPACE/kernel-common"
       - name: Build bridge (aarch64)
