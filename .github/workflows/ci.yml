@@ -27,8 +27,8 @@ jobs:
       - name: Install build deps
         run: |
           sudo apt-get update
-          sudo apt-get install -y flex bison libssl-dev bc libelf-dev pkg-config \
-            dwarves python3 gcc-aarch64-linux-gnu
+          sudo apt-get install -y flex bison libssl-dev bc libelf-dev libdw-dev \
+            pkg-config dwarves python3 gcc-aarch64-linux-gnu
       - name: Cache GKI kernel tree
         id: cache-kernel
         uses: actions/cache@v4
