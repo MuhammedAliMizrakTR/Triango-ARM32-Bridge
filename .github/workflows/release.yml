@@ -71,7 +71,13 @@ jobs:
       - name: Host tests - nativebridge
         run: make -C nativebridge test
       - name: Host tests - engine
-        run: make -C nativebridge engine-test
+        run: |
+          make -C nativebridge engine-test > out.log 2>&1 || {
+            echo "::error::engine-test failed; output follows:"
+            tail -40 out.log | while IFS= read -r l; do echo "::error::$l"; done
+            exit 1
+          }
+          tail -2 out.log
 
       - name: Build bridge (aarch64)
         run: make -C bridge CROSS_COMPILE=aarch64-linux-gnu- all
