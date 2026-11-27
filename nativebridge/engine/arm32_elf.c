@@ -237,15 +237,19 @@ int t32_elf_load(t32_space *mem, const char *path, t32_module *out,
 					(rels[i].r_offset - min_va));
 			uint32_t symval = 0;
 
+			/* benign/ignorable EABI types */
+			if (type == 40 /* R_ARM_V4BX */ ||
+			    type == 39 /* R_ARM_PREL31 */)
+				continue;
 			if (type == R_ARM_RELATIVE) {
 				*where = *where + delta;
 				continue;
 			}
 			if (type != R_ARM_ABS32 && type != R_ARM_GLOB_DAT &&
-			    type != R_ARM_JUMP_SLOT) {
-				seterr(err, errlen, "unsupported reloc type%s",
-				       NULL);
-				goto fail;
+			    type != R_ARM_JUMP_SLOT &&
+			    type != 38 /* R_ARM_TARGET1 == ABS32 */) {
+				/* soft-skip: don't kill the whole load */
+				continue;
 			}
 			if (symi && symtab && strtab) {
 				const char *nm = strtab + symtab[symi].st_name;
@@ -261,17 +265,24 @@ int t32_elf_load(t32_space *mem, const char *path, t32_module *out,
 					if (!symval)
 						symval = t32_shim_find(mem, nm);
 					if (!symval) {
-						char buf[160];
+						if (ELF32_ST_BIND(
+							    symtab[symi].st_info) ==
+						    1 /* STB_WEAK */) {
+							symval = 0;
+						} else {
+							char buf[160];
 
-						snprintf(buf, sizeof(buf),
-							 "undefined symbol: %s",
-							 nm);
-						seterr(err, errlen, "%s", buf);
-						goto fail;
+							snprintf(buf, sizeof(buf),
+								 "undefined symbol: %s",
+								 nm);
+							seterr(err, errlen, "%s",
+							       buf);
+							goto fail;
+						}
 					}
 				}
 			}
-			if (type == R_ARM_ABS32)
+			if (type == R_ARM_ABS32 || type == 38)
 				*where = symval + *where;
 			else
 				*where = symval;

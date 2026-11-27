@@ -182,6 +182,15 @@ static uint64_t sh_abort(uint64_t a0, uint64_t a1, uint64_t a2, uint64_t a3)
 	return 0;
 }
 
+static uint64_t sh_nop_ret0(uint64_t a0, uint64_t a1, uint64_t a2, uint64_t a3)
+{
+	(void)a0;
+	(void)a1;
+	(void)a2;
+	(void)a3;
+	return 0;
+}
+
 /* extra libc surface (run at full host speed) */
 static uint64_t sh_strcpy(uint64_t d, uint64_t s, uint64_t a2, uint64_t a3)
 {
@@ -454,4 +463,8 @@ void t32_shim_install_builtins(t32_space *sp)
 	t32_shim_install(sp, "__aeabi_memcpy8", sh_aeabi_memcpy8);
 	t32_shim_install(sp, "__aeabi_memmove", sh_memcpy);
 	t32_shim_install(sp, "__aeabi_memset", sh_memset);
+	/* CRT glue seen in toolchain-built .so files (harmless no-ops) */
+	t32_shim_install(sp, "__cxa_finalize", sh_nop_ret0);
+	t32_shim_install(sp, "__cxa_atexit", sh_nop_ret0);
+	t32_shim_install(sp, "__gmon_start__", sh_nop_ret0);
 }

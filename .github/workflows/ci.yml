@@ -19,7 +19,13 @@ jobs:
       - name: NativeBridge tests
         run: make -C nativebridge test
       - name: Engine interpreter tests
-        run: make -C nativebridge engine-test
+        run: make -C nativebridge engine-test 2>&1 | tee engine-test.log
+      - name: Upload engine test log (on failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: engine-test-log
+          path: engine-test.log
       - name: Build bridge binary
         run: make -C bridge all
       - name: Selftest
