@@ -6,6 +6,7 @@
 #   TRIANGO_BRIDGE  - AArch64 bridge binary (default: bridge/build/triango-bridge)
 #   TRIANGO_KO      - kernel module             (default: kernel/triango-bridge-lkm/triango_bridge.ko)
 #   TRIANGO_NB_LIB  - NativeBridge library      (default: nativebridge/prebuilt/libtriango_native_bridge.so)
+#   TRIANGO_ENGINE  - interpreter engine plug-in (default: nativebridge/build/libtriango_nb_engine.so)
 #   TRIANGO_GPUD    - GPU thunk daemon          (default: gpu/build/triango-gpud)
 # Missing payloads are skipped with a warning (the module then relies on the
 # binfmt_misc fallback / manual deployment).
@@ -17,6 +18,7 @@ DIST="$ROOT/dist"
 BRIDGE="${TRIANGO_BRIDGE:-$ROOT/bridge/build/triango-bridge}"
 KO="${TRIANGO_KO:-$ROOT/kernel/triango-bridge-lkm/triango_bridge.ko}"
 NBLIB="${TRIANGO_NB_LIB:-$ROOT/nativebridge/prebuilt/libtriango_native_bridge.so}"
+ENGINE="${TRIANGO_ENGINE:-$ROOT/nativebridge/build/libtriango_nb_engine.so}"
 GPUD="${TRIANGO_GPUD:-$ROOT/gpu/build/triango-gpud}"
 
 VERSION="$(sed -n 's/^version=//p' "$ROOT/module/module.prop")"
@@ -46,6 +48,13 @@ if [[ -f "$NBLIB" ]]; then
 	cp "$NBLIB" "$STAGE/libtriango_native_bridge.so"
 else
 	echo "warning: NativeBridge library not found at '$NBLIB' — build with tools/build-nativebridge.sh <ndk>" >&2
+fi
+
+# Interpreter engine plug-in (V1.1(a)) -> /data/adb/triango/lib staging.
+if [[ -f "$ENGINE" ]]; then
+	cp "$ENGINE" "$STAGE/libtriango_nb_engine.so"
+else
+	echo "warning: engine plug-in not found at '$ENGINE' — build with make -C nativebridge engine" >&2
 fi
 
 # GPU thunk daemon.

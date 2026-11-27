@@ -36,8 +36,10 @@
 
 - [x] **NativeBridge arayüzü + modül** (`ro.dalvik.vm.native.bridge=libtriango_native_bridge.so`,
   WebUI, soft reboot) — `docs/nativebridge.md`
-- [ ] **Motor eklentisi**: `libtriango_nb_engine.so` (qemu-user köprüsü →
-  Triango JIT) — `nb_engine.h` ABI'si hazır
+- [x] **Motor eklentisi**: `libtriango_nb_engine.so` — V1.1(a): ARM/Thumb-2
+  yorumlayıcı + ELF32 yükleyici + host trambolin + libc shim'leri (30 test).
+  Native hız (JIT) bir sonraki adım: `nativebridge/engine/` üzerine
+  arm32→arm64 blok çevirici.
 - [ ] zygote32 / `app_process32` yolu: arm32 ART + 32-bit framework kütüphaneleri
 - [ ] Binder/servis köprüsü: arm32 uygulama ↔ 64-bit system_server
 - [ ] SurfaceFlinger/GPU: EGL/Vulkan **dişli** tamamlama (struct_conv üreteci,

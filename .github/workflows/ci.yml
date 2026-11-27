@@ -10,12 +10,22 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Install cross toolchain (arm32 guest .so test)
+        run: sudo apt-get update && sudo apt-get install -y gcc-arm-linux-gnueabi
       - name: Unit tests
         run: make -C bridge test
       - name: GPU thunk tests
         run: make -C gpu test
       - name: NativeBridge tests
         run: make -C nativebridge test
+      - name: Engine interpreter tests
+        run: make -C nativebridge engine-test 2>&1 | tee engine-test.log
+      - name: Upload engine test log (on failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: engine-test-log
+          path: engine-test.log
       - name: Build bridge binary
         run: make -C bridge all
       - name: Selftest
@@ -79,8 +89,13 @@ jobs:
         run: make -C bridge CROSS_COMPILE=aarch64-linux-gnu- all
       - name: Build gpud (aarch64)
         run: make -C gpu CROSS_COMPILE=aarch64-linux-gnu- gpud
+      - name: Build NativeBridge lib + engine (aarch64)
+        run: make -C nativebridge CROSS_COMPILE=aarch64-linux-gnu- lib engine
       - name: Package KernelSU module zip
-        run: ./tools/package-module.sh
+        run: |
+          TRIANGO_NB_LIB=nativebridge/build/libtriango_native_bridge.so \
+          TRIANGO_ENGINE=nativebridge/build/libtriango_nb_engine.so \
+          ./tools/package-module.sh
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
