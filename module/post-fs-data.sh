@@ -21,6 +21,31 @@ fi
 mkdir -p "$TRI/engines" "$TRI/sysroot32" 2>/dev/null
 chmod 700 "$TRI" 2>/dev/null
 
+# ---- ABI advertising (fixes INSTALL_FAILED_NO_MATCHING_ABIS) ----
+# Must run BEFORE system_server caches Build.SUPPORTED_ABIS — post-fs-data is
+# the right stage. See docs/abi-fix.md. Opt-out:
+#   /data/adb/triango/config/disable_abilist32
+if [ ! -f "$TRI/config/disable_abilist32" ]; then
+	RESETPROP=""
+	for c in resetprop /data/adb/ksu/bin/resetprop /data/adb/magisk/resetprop \
+		/system/bin/resetprop; do
+		if command -v "$c" >/dev/null 2>&1; then
+			RESETPROP="$c"
+			break
+		fi
+	done
+	if [ -n "$RESETPROP" ]; then
+		"$RESETPROP" ro.product.cpu.abilist "arm64-v8a,armeabi-v7a,armeabi" 2>/dev/null
+		"$RESETPROP" ro.product.cpu.abilist32 "armeabi-v7a,armeabi" 2>/dev/null
+		"$RESETPROP" ro.product.cpu.abilist64 "arm64-v8a" 2>/dev/null
+		"$RESETPROP" ro.vendor.product.cpu.abilist "arm64-v8a,armeabi-v7a,armeabi" 2>/dev/null
+		"$RESETPROP" ro.vendor.product.cpu.abilist32 "armeabi-v7a,armeabi" 2>/dev/null
+		log "abilist32 advertised via $RESETPROP (INSTALL_FAILED_NO_MATCHING_ABIS fix)"
+	else
+		log "resetprop not found; relying on module system.prop for abilist32"
+	fi
+fi
+
 # Stage module payloads into /data/adb/triango.
 for f in triango-bridge triango-bridge-lkm triango_bridge.ko; do
 	[ -f "$MODDIR/$f" ] && cp -f "$MODDIR/$f" "$TRI/$f" 2>/dev/null

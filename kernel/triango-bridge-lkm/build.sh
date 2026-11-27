@@ -26,7 +26,11 @@ if [[ ! -f "$KERNEL_SRC/include/generated/autoconf.h" ]]; then
     exit 1
 fi
 
-make -C "$HERE" KERNEL_SRC="$KERNEL_SRC" ARCH=arm64 CROSS_COMPILE="$CROSS" modules
+# KBUILD_MODPOST_WARN: building against a modules_prepare-only tree has no
+# Module.symvers; unresolved exports are expected (GKI ABI + runtime symbol
+# resolution back them) and modpost errors become warnings.
+make -C "$HERE" KERNEL_SRC="$KERNEL_SRC" ARCH=arm64 CROSS_COMPILE="$CROSS" \
+	KBUILD_MODPOST_WARN=1 modules
 
 KO="$HERE/triango_bridge.ko"
 if [[ -f "$KO" ]]; then

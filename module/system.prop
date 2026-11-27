@@ -1,11 +1,17 @@
-# Triango ARM32 Bridge — optional system properties.
+# Triango ARM32 Bridge — system properties.
 #
-# WARNING (v0.1): the lines below are DISABLED on purpose. Advertising
-# armeabi-v7a via ro.product.cpu.abilist32 lets the PackageManager *install*
-# arm32 APKs, but app-level execution additionally needs zygote32 + an ART
-# translation layer (roadmap v0.3). Enabling them early will produce installs
-# that crash at launch. Enable only for experiments.
+# ABI reklamı (v0.2): INSTALL_FAILED_NO_MATCHING_ABIS sorununu çözer —
+# PackageManager'ın arm32 APK'ları kurmasına izin verir. Ayrıntılar ve
+# güvenlik notları: docs/abi-fix.md.
 #
-# ro.product.cpu.abilist=arm64-v8a,armeabi-v7a,armeabi
-# ro.product.cpu.abilist32=armeabi-v7a,armeabi
-# ro.product.cpu.abilist64=arm64-v8a
+# Kaldırmak için: /data/adb/triango/config/disable_abilist32 dosyasını
+# oluşturun (post-fs-data.sh resetprop adımını atlar) ve bu satırları
+# yorumlayıp modülü yeniden kurun.
+#
+# NOT: Uygulama düzeyi çalıştırma (zygote32/ART + NativeBridge) roadmap
+# v0.3'tedir; bu prop'lar yalnızca kurulum/akış katmanını açar.
+ro.product.cpu.abilist=arm64-v8a,armeabi-v7a,armeabi
+ro.product.cpu.abilist32=armeabi-v7a,armeabi
+ro.product.cpu.abilist64=arm64-v8a
+ro.vendor.product.cpu.abilist=arm64-v8a,armeabi-v7a,armeabi
+ro.vendor.product.cpu.abilist32=armeabi-v7a,armeabi

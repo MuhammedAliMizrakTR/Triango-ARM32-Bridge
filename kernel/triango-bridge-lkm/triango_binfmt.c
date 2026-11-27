@@ -189,7 +189,6 @@ static int triango_read_interp(struct linux_binprm *bprm,
 
 static int triango_load_binary(struct linux_binprm *bprm)
 {
-	const struct triango_elf32 *eh;
 	struct file *file;
 	char interp[TRIANGO_INTERP_MAX];
 	int retval;

@@ -12,6 +12,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Unit tests
         run: make -C bridge test
+      - name: GPU thunk tests
+        run: make -C gpu test
       - name: Build bridge binary
         run: make -C bridge all
       - name: Selftest
@@ -25,23 +27,52 @@ jobs:
       - name: Install build deps
         run: |
           sudo apt-get update
-          sudo apt-get install -y flex bison libssl-dev bc gcc-aarch64-linux-gnu
+          sudo apt-get install -y flex bison libssl-dev bc libelf-dev libdw-dev \
+            pkg-config dwarves python3 gcc-aarch64-linux-gnu
       - name: Cache GKI kernel tree
         id: cache-kernel
         uses: actions/cache@v4
         with:
           path: kernel-common
           key: gki-android16-6.12-v1
-      - name: Fetch & prepare GKI kernel tree
+      - name: Clone GKI kernel tree
         if: steps.cache-kernel.outputs.cache-hit != 'true'
         run: |
-          git clone --depth=1 -b android16-6.12 \
-            https://android.googlesource.com/kernel/common kernel-common
-          make -C kernel-common ARCH=arm64 gki_defconfig || make -C kernel-common ARCH=arm64 defconfig
-          make -C kernel-common ARCH=arm64 olddefconfig
-          make -C kernel-common ARCH=arm64 modules_prepare
+          set -e
+          echo "::notice::cloning GKI kernel (AOSP)"
+          if ! git clone --depth=1 -b android16-6.12 \
+              https://android.googlesource.com/kernel/common kernel-common; then
+            echo "::warning::AOSP clone failed; trying GitHub mirror"
+            rm -rf kernel-common
+            git clone --depth=1 -b android16-6.12 \
+              https://github.com/aosp-mirror/kernel_common kernel-common
+          fi
+      - name: Configure GKI kernel tree
+        if: steps.cache-kernel.outputs.cache-hit != 'true'
+        run: |
+          make -C kernel-common ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- gki_defconfig \
+            || make -C kernel-common ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- defconfig
+      - name: Prepare GKI kernel tree (modules_prepare)
+        if: steps.cache-kernel.outputs.cache-hit != 'true'
+        run: |
+          make -C kernel-common ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- olddefconfig
+          if ! make -C kernel-common ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- modules_prepare; then
+            err=$(make -C kernel-common ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- modules_prepare V=1 2>&1 | tail -25)
+            err="${err//'%'/'%25'}"
+            err="${err//$'\n'/'%0A'}"
+            echo "::error::modules_prepare failed. tail: $err"
+            exit 2
+          fi
       - name: Build triango_bridge.ko
-        run: ./kernel/triango-bridge-lkm/build.sh "$GITHUB_WORKSPACE/kernel-common"
+        run: |
+          if ! ./kernel/triango-bridge-lkm/build.sh "$GITHUB_WORKSPACE/kernel-common"; then
+            err=$(make -C "$GITHUB_WORKSPACE/kernel-common" M="$GITHUB_WORKSPACE/kernel/triango-bridge-lkm" \
+              ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- modules KBUILD_MODPOST_WARN=1 2>&1 | tail -25)
+            err="${err//'%'/'%25'}"
+            err="${err//$'\n'/'%0A'}"
+            echo "::error::LKM build failed. tail: $err"
+            exit 2
+          fi
       - name: Build bridge (aarch64)
         run: make -C bridge CROSS_COMPILE=aarch64-linux-gnu- all
       - name: Package KernelSU module zip
