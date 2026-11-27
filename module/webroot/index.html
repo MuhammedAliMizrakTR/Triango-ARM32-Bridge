@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Triango ARM32 Bridge</title>
+<style>
+  :root {
+    --bg0: #0b1120; --bg1: #111c33; --card: rgba(30, 41, 59, .72);
+    --stroke: rgba(148, 163, 184, .16);
+    --text: #e2e8f0; --muted: #94a3b8;
+    --ok: #34d399; --warn: #fbbf24; --err: #f87171;
+    --accent: #22d3ee; --accent2: #818cf8;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, "Segoe UI", Roboto, "Noto Sans", sans-serif;
+    background:
+      radial-gradient(1200px 500px at 85% -10%, rgba(129, 140, 248, .18), transparent 60%),
+      radial-gradient(900px 420px at -10% 20%, rgba(34, 211, 238, .12), transparent 55%),
+      linear-gradient(180deg, var(--bg0), var(--bg1));
+    color: var(--text);
+    min-height: 100vh;
+    padding: 20px clamp(14px, 4vw, 34px) 48px;
+    -webkit-font-smoothing: antialiased;
+  }
+  header { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  .logo {
+    width: 46px; height: 46px; border-radius: 13px; flex: none;
+    background: linear-gradient(135deg, rgba(34, 211, 238, .22), rgba(129, 140, 248, .22));
+    border: 1px solid var(--stroke);
+    display: grid; place-items: center;
+    box-shadow: 0 8px 28px rgba(34, 211, 238, .12);
+  }
+  h1 { font-size: clamp(20px, 5.4vw, 27px); font-weight: 700; letter-spacing: .2px; }
+  .sub { color: var(--muted); font-size: 12.5px; margin-top: 2px; }
+  .badge {
+    margin-left: auto; font-size: 11.5px; color: var(--accent);
+    border: 1px solid rgba(34, 211, 238, .35); border-radius: 999px;
+    padding: 5px 12px; background: rgba(34, 211, 238, .08);
+  }
+  .lang {
+    display: flex; gap: 4px; background: rgba(15, 23, 42, .6);
+    border: 1px solid var(--stroke); border-radius: 10px; padding: 3px;
+  }
+  .lang button {
+    border: 0; background: transparent; color: var(--muted);
+    font-size: 12px; font-weight: 600; padding: 5px 11px;
+    border-radius: 8px; cursor: pointer;
+  }
+  .lang button.on { background: rgba(34, 211, 238, .16); color: var(--accent); }
+
+  .grid {
+    display: grid; gap: 13px; margin-top: 22px;
+    grid-template-columns: repeat(auto-fit, minmax(158px, 1fr));
+  }
+  .card {
+    background: var(--card); border: 1px solid var(--stroke);
+    border-radius: 16px; padding: 15px 16px;
+    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  }
+  .card h3 {
+    font-size: 11px; text-transform: uppercase; letter-spacing: 1.1px;
+    color: var(--muted); font-weight: 600;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .dot {
+    width: 9px; height: 9px; border-radius: 50%; flex: none;
+    background: var(--muted); box-shadow: 0 0 0 3px rgba(148, 163, 184, .12);
+  }
+  .dot.ok  { background: var(--ok);  box-shadow: 0 0 0 3px rgba(52, 211, 153, .15); }
+  .dot.warn{ background: var(--warn);box-shadow: 0 0 0 3px rgba(251, 191, 36, .15); }
+  .dot.err { background: var(--err); box-shadow: 0 0 0 3px rgba(248, 113, 113, .15); }
+  .card .val { margin-top: 10px; font-size: 15.5px; font-weight: 650; word-break: break-word; }
+  .card .note { margin-top: 4px; font-size: 11.5px; color: var(--muted); line-height: 1.45; }
+
+  h2 {
+    margin: 28px 2px 12px; font-size: 13px; font-weight: 700;
+    letter-spacing: 1.2px; text-transform: uppercase; color: var(--muted);
+  }
+  .actions { display: grid; gap: 11px; grid-template-columns: repeat(auto-fit, minmax(215px, 1fr)); }
+  button.act {
+    border: 1px solid var(--stroke); border-radius: 14px;
+    background: var(--card); color: var(--text);
+    padding: 15px 17px; text-align: left; cursor: pointer;
+    display: flex; gap: 13px; align-items: center;
+    transition: transform .12s ease, border-color .12s ease, background .12s;
+    font: inherit;
+  }
+  button.act:hover { transform: translateY(-2px); border-color: rgba(34, 211, 238, .4); }
+  button.act:active { transform: translateY(0); }
+  button.act .ic {
+    width: 38px; height: 38px; border-radius: 11px; flex: none;
+    display: grid; place-items: center;
+    background: rgba(34, 211, 238, .12); color: var(--accent);
+  }
+  button.act .t { font-size: 14.5px; font-weight: 650; }
+  button.act .d { font-size: 11.5px; color: var(--muted); margin-top: 2px; line-height: 1.4; }
+  button.act.primary {
+    background: linear-gradient(135deg, rgba(34, 211, 238, .22), rgba(129, 140, 248, .2));
+    border-color: rgba(34, 211, 238, .4);
+  }
+  button.act.danger .ic { background: rgba(248, 113, 113, .12); color: var(--err); }
+
+  .term {
+    background: rgba(2, 6, 23, .78); border: 1px solid var(--stroke);
+    border-radius: 16px; padding: 14px 16px;
+    font-family: ui-monospace, "JetBrains Mono", Menlo, Consolas, monospace;
+    font-size: 11.8px; line-height: 1.65; color: #a5f3fc;
+    white-space: pre-wrap; word-break: break-word;
+    min-height: 120px; max-height: 320px; overflow-y: auto;
+  }
+  .term .ph { color: var(--muted); font-family: inherit; }
+  footer {
+    margin-top: 30px; color: var(--muted); font-size: 11.5px;
+    display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+    border-top: 1px solid var(--stroke); padding-top: 16px;
+  }
+  #toasts {
+    position: fixed; right: 14px; bottom: 16px; z-index: 50;
+    display: flex; flex-direction: column; gap: 8px; max-width: min(86vw, 360px);
+  }
+  .toast {
+    background: rgba(15, 23, 42, .95); border: 1px solid var(--stroke);
+    border-left: 3px solid var(--accent); border-radius: 12px;
+    padding: 11px 14px; font-size: 12.5px; line-height: 1.5;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, .4);
+    animation: slide .18s ease;
+  }
+  .toast.err { border-left-color: var(--err); }
+  .toast.ok { border-left-color: var(--ok); }
+  @keyframes slide { from { transform: translateY(8px); opacity: 0; } }
+  .spin { animation: rot 1s linear infinite; }
+  @keyframes rot { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
+      <path d="M12 3 L21.5 20 H2.5 Z" stroke="url(#g)" stroke-width="2"
+            stroke-linejoin="round" fill="rgba(34,211,238,.14)"/>
+      <path d="M12 9.2 L16.8 18 H7.2 Z" fill="url(#g)" opacity=".85"/>
+      <defs>
+        <linearGradient id="g" x1="0" y1="0" x2="24" y2="24">
+          <stop offset="0" stop-color="#22d3ee"/><stop offset="1" stop-color="#818cf8"/>
+        </linearGradient>
+      </defs>
+    </svg>
+  </div>
+  <div>
+    <h1>Triango ARM32 Bridge</h1>
+    <div class="sub" data-i="sub">Arm32 · NativeBridge · GPU dişli katmanı</div>
+  </div>
+  <div class="badge">v1.0.0</div>
+  <div class="lang">
+    <button id="lang-tr" class="on" onclick="setLang('tr')">TR</button>
+    <button id="lang-en" onclick="setLang('en')">EN</button>
+  </div>
+</header>
+
+<div class="grid" id="status-grid">
+  <div class="card">
+    <h3><span class="dot" id="d-nb"></span><span data-i="nb">NativeBridge</span></h3>
+    <div class="val" id="v-nb">…</div>
+    <div class="note" id="n-nb">ro.dalvik.vm.native.bridge</div>
+  </div>
+  <div class="card">
+    <h3><span class="dot" id="d-abi"></span><span data-i="abi">ABI Props</span></h3>
+    <div class="val" id="v-abi">…</div>
+    <div class="note" id="n-abi">ro.product.cpu.abilist32</div>
+  </div>
+  <div class="card">
+    <h3><span class="dot" id="d-lib"></span><span data-i="lib">Bridge Library</span></h3>
+    <div class="val" id="v-lib">…</div>
+    <div class="note">/data/adb/triango/lib/libtriango_native_bridge.so</div>
+  </div>
+  <div class="card">
+    <h3><span class="dot" id="d-gpu"></span><span data-i="gpu">GPU Daemon</span></h3>
+    <div class="val" id="v-gpu">…</div>
+    <div class="note">triango-gpud (GLES/Vulkan dişli)</div>
+  </div>
+</div>
+
+<h2 data-i="actions">İşlemler</h2>
+<div class="actions">
+  <button class="act primary" onclick="activate()">
+    <div class="ic">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="2" stroke-linecap="round"><path d="M13 2 L4.5 13.5 H11 L10 22 L19.5 10 H13 Z"/></svg>
+    </div>
+    <div><div class="t" data-i="act-activate">Aktive Et · Soft Reboot</div>
+         <div class="d" data-i="d-activate">Prop + linkerconfig + zygote yeniden başlatma</div></div>
+  </button>
+  <button class="act" onclick="softReboot()">
+    <div class="ic">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="2" stroke-linecap="round"><path d="M20 12 a8 8 0 1 1 -2.3-5.6"/><path d="M20 3 v5 h-5"/></svg>
+    </div>
+    <div><div class="t" data-i="act-soft">Soft Reboot</div>
+         <div class="d" data-i="d-soft">Yalnızca çerçeveyi (zygote) yeniden başlat</div></div>
+  </button>
+  <button class="act" onclick="gpudToggle()">
+    <div class="ic">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="2" stroke-linecap="round"><rect x="4" y="4" width="16" height="16" rx="3"/><rect x="9" y="9" width="6" height="6" rx="1"/><path d="M9 1v3M15 1v3M9 20v3M15 20v3M1 9h3M1 15h3M20 9h3M20 15h3"/></svg>
+    </div>
+    <div><div class="t" data-i="act-gpud">gpud Başlat / Durdur</div>
+         <div class="d" data-i="d-gpud">GLES/Vulkan dişli daemon'ı yönet</div></div>
+  </button>
+  <button class="act danger" onclick="fullReboot()">
+    <div class="ic">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="2" stroke-linecap="round"><path d="M12 2v10"/><path d="M6.3 6.3 a8 8 0 1 0 11.4 0"/></svg>
+    </div>
+    <div><div class="t" data-i="act-reboot">Tam Yeniden Başlat</div>
+         <div class="d" data-i="d-reboot">Cihazı yeniden başlat (güvenli aktifleştirme)</div></div>
+  </button>
+</div>
+
+<h2 data-i="logs">Günlük</h2>
+<div class="term" id="log"><span class="ph">—</span></div>
+
+<footer>
+  <span>Triango ARM32 Bridge · MIT · MuhammedAliMizrakTR</span>
+  <span data-i="foot">KernelSU · BakaSU LKM Jailbreak Mode</span>
+</footer>
+
+<div id="toasts"></div>
+
+<script>
+/* ---------------- KernelSU WebUI bridge (defensive) ---------------- */
+function ksuExec(cmd) {
+  return new Promise((resolve, reject) => {
+    const cb = (a, b, c) => {
+      // Known shapes: cb(errno, stdout, stderr) | cb({code, stdout, stderr})
+      if (a && typeof a === "object") {
+        resolve({ code: a.code ?? a.errno ?? 0, out: a.stdout ?? "", err: a.stderr ?? "" });
+      } else {
+        resolve({ code: typeof a === "number" ? a : 0, out: String(b ?? ""), err: String(c ?? "") });
+      }
+    };
+    try {
+      if (window.ksu && typeof window.ksu.exec === "function") {
+        const r = window.ksu.exec(cmd, cb);
+        if (r && typeof r.then === "function") {
+          r.then(res => resolve(typeof res === "object" ? res : { code: 0, out: String(res ?? ""), err: "" }))
+           .catch(reject);
+        }
+      } else {
+        reject(new Error("ksu-unavailable"));
+      }
+    } catch (e) { reject(e); }
+  });
+}
+
+function toast(msg, kind) {
+  const box = document.getElementById("toasts");
+  const el = document.createElement("div");
+  el.className = "toast " + (kind || "");
+  el.textContent = msg;
+  box.appendChild(el);
+  try { if (window.ksu && window.ksu.toast) window.ksu.toast(msg); } catch (e) {}
+  setTimeout(() => el.remove(), 5200);
+}
+
+/* ---------------- i18n ---------------- */
+const I18N = {
+  tr: {
+    sub: "Arm32 · NativeBridge · GPU dişli katmanı",
+    nb: "NativeBridge", abi: "ABI Props", lib: "Bridge Kütüphanesi", gpu: "GPU Daemon",
+    actions: "İşlemler", logs: "Günlük",
+    "act-activate": "Aktive Et · Soft Reboot",
+    "d-activate": "Prop + linkerconfig + zygote yeniden başlatma",
+    "act-soft": "Soft Reboot", "d-soft": "Yalnızca çerçeveyi (zygote) yeniden başlat",
+    "act-gpud": "gpud Başlat / Durdur", "d-gpud": "GLES/Vulkan dişli daemon'ı yönet",
+    "act-reboot": "Tam Yeniden Başlat", "d-reboot": "Cihazı yeniden başlat",
+    foot: "KernelSU · BakaSU LKM Jailbreak Mode",
+    on: "aktif", off: "kapalı", missing: "eksik", running: "çalışıyor", stopped: "durdu",
+    done: "Tamamlandı", fail: "Başarısız", noconsole: "Konsol yok (KernelSU WebUI içinde açın)",
+  },
+  en: {
+    sub: "Arm32 · NativeBridge · GPU thunk layer",
+    nb: "NativeBridge", abi: "ABI Props", lib: "Bridge Library", gpu: "GPU Daemon",
+    actions: "Actions", logs: "Logs",
+    "act-activate": "Activate · Soft Reboot",
+    "d-activate": "Props + linkerconfig + restart zygote",
+    "act-soft": "Soft Reboot", "d-soft": "Restart the framework (zygote) only",
+    "act-gpud": "Start / Stop gpud", "d-gpud": "Manage the GLES/Vulkan thunk daemon",
+    "act-reboot": "Full Reboot", "d-reboot": "Reboot the device (safest activation)",
+    foot: "KernelSU · BakaSU LKM Jailbreak Mode",
+    on: "on", off: "off", missing: "missing", running: "running", stopped: "stopped",
+    done: "Done", fail: "Failed", noconsole: "No console (open inside KernelSU WebUI)",
+  },
+};
+let LANG = "tr";
+function t(k) { return (I18N[LANG] && I18N[LANG][k]) || k; }
+function setLang(l) {
+  LANG = l;
+  document.getElementById("lang-tr").className = l === "tr" ? "on" : "";
+  document.getElementById("lang-en").className = l === "en" ? "on" : "";
+  document.querySelectorAll("[data-i]").forEach(el => {
+    const k = el.getAttribute("data-i");
+    if (I18N[l][k]) el.textContent = I18N[l][k];
+  });
+  refresh();
+}
+
+/* ---------------- status + actions ---------------- */
+function setCard(prefix, state, value) {
+  const d = document.getElementById("d-" + prefix);
+  d.className = "dot " + (state || "");
+  document.getElementById("v-" + prefix).textContent = value;
+}
+
+async function refresh() {
+  let res;
+  try {
+    res = await ksuExec(
+      'echo "NB=$(getprop ro.dalvik.vm.native.bridge)";' +
+      'echo "ABI=$(getprop ro.product.cpu.abilist32)";' +
+      'echo "LIB=$([ -f /data/adb/triango/lib/libtriango_native_bridge.so ] && echo 1 || echo 0)";' +
+      'echo "GPU=$(pidof triango-gpud >/dev/null && echo 1 || echo 0)"'
+    );
+  } catch (e) {
+    setCard("nb", "err", t("noconsole"));
+    setCard("abi", "", "—"); setCard("lib", "", "—"); setCard("gpu", "", "—");
+    return;
+  }
+  const get = k => {
+    const m = res.out.match(new RegExp("^" + k + "=(.*)$", "m"));
+    return m ? m[1].trim() : "";
+  };
+  const nb = get("NB"), abi = get("ABI"), lib = get("LIB"), gpu = get("GPU");
+
+  setCard("nb", nb && nb !== "0" ? "ok" : "err",
+          nb && nb !== "0" ? nb : t("off"));
+  setCard("abi", abi ? "ok" : "err", abi || t("off"));
+  setCard("lib", lib === "1" ? "ok" : "warn", lib === "1" ? t("on") : t("missing"));
+  setCard("gpu", gpu === "1" ? "ok" : "warn", gpu === "1" ? t("running") : t("stopped"));
+}
+
+async function run(cmd, okMsg) {
+  try {
+    const r = await ksuExec(cmd);
+    if (r.code === 0) toast(okMsg || t("done"), "ok");
+    else toast((r.err || r.out || t("fail")).slice(0, 240), "err");
+  } catch (e) {
+    toast(t("noconsole"), "err");
+  }
+  setTimeout(refresh, 900);
+  setTimeout(loadLogs, 1200);
+}
+
+const MOD = "/data/adb/modules/triango_arm32_bridge";
+
+function activate() {
+  run("sh " + MOD + "/activate.sh", t("done") + " · soft reboot");
+}
+function softReboot() {
+  run("setprop ctl.restart zygote; setprop ctl.restart zygote_secondary", t("done"));
+}
+function gpudToggle() {
+  run("if pidof triango-gpud >/dev/null; then " +
+      "pkill -f triango-gpud; else " +
+      "/data/adb/triango/triango-gpud >> /data/adb/triango/log/gpud.log 2>&1 & fi", t("done"));
+}
+function fullReboot() {
+  run("svc power reboot || reboot", t("done"));
+}
+
+async function loadLogs() {
+  try {
+    const r = await ksuExec("tail -n 60 /data/adb/triango/log/nativebridge.log " +
+      "/data/adb/triango/log/post-fs-data.stamp 2>/dev/null; " +
+      "tail -n 20 /data/adb/triango/log/gpud.log 2>/dev/null");
+    document.getElementById("log").textContent = r.out.trim() || "—";
+  } catch (e) {
+    document.getElementById("log").innerHTML = '<span class="ph">—</span>';
+  }
+}
+
+refresh();
+loadLogs();
+setInterval(refresh, 6000);
+</script>
+</body>
+</html>

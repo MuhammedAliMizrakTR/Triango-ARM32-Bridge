@@ -59,21 +59,21 @@ ro.vendor.product.cpu.abilist32=armeabi-v7a,armeabi
 Sonuç: arm32 APK'lar **kurulur** ve `lib/armeabi-v7a` kütüphaneleri
 doğru ABI ile ayıklanır.
 
-### 3. Çalıştırma (bu adım v0.3) — NativeBridge
+### 3. Çalıştırma — NativeBridge (v1.0 modülü) ✅
 
-Kurulumun çözülmesi **çalıştırma** anlamına gelmez: stok sistemde
-`zygote32`/`app_process32` ve arm32 ART yoktur. Nihai çözüm Android'in resmi
-ISA-çeviri kancasıdır (libhoudini/ndk_translation'ın da kullandığı):
+Kurulumun çözülmesi **çalıştırma** anlamına gelmez: stok sistemde arm32
+native kod için ISA çevirisi gerekir. Triango v1.0 modülü Android'in resmi
+kancasını bağlar:
 
 ```
-ro.dalvik.vm.native.bridge=libtriango_native_bridge.so
+ro.dalvik.vm.native.bridge=/data/adb/triango/lib/libtriango_native_bridge.so
 ```
 
-`libtriango_native_bridge.so` = Android **NativeBridge** arayüzünü
-uygulayan Triango kütüphanesi: ART, arm32 native yüklemelerini Triango
-çeviri motoruna (qemu/JIT) devreder. Yol haritası v0.3
-(`docs/roadmap.md`); GPU tarafı `docs/gpu-thunking.md` ile birlikte
-"3D uygulama çalıştırma" bileşkesini tamamlar.
+`libtriango_native_bridge.so` = Android **NativeBridge** arayüzü (v6)
+uygulaması: `isSupported` (ELF32+EM_ARM), `loadLibrary`, `getTrampoline` —
+motor eklentisi üzerinden. **Soft reboot ile aktive olur** (tam yeniden
+başlatma gerekmez) ve **WebUI**'den yönetilir. Ayrıntılar + dürüstlük notu
+(motor eklentisi yol haritasında): [`docs/nativebridge.md`](docs/nativebridge.md).
 
 ## Doğrulama / Verification
 
@@ -99,7 +99,8 @@ sıralama onu öncelikli tutar.
 aynı prop'lara bakar; reklam sonrası uyumlu görünür (cihaz sertifikası
 düzeyinde ek etkenler olabilir).
 
-**S: Kurulan arm32 uygulama şimdi çalışır mı?** Hayır — çalıştırma için
-v0.3 (NativeBridge + zygote32/ART) gerekir; şu an yalnızca kurulum/akış
-sorunu giderilir. (Konsol/native binary'ler `triango-bridge` ile zaten
-çalışır — o ayrı yoldur.)
+**S: Kurulan arm32 uygulama şimdi çalışır mı?** Kurulum + APK akışı açık;
+arm32 native kodun **çevrilerek** çalışması NativeBridge + motor eklentisi
+zincirine bağlıdır (`docs/nativebridge.md` §6 — motor entegrasyonu yol
+haritasında, arayüz v1.0'da hazır). (Konsol/native binary'ler `triango-bridge`
+ile zaten çalışır — o ayrı yoldur.)

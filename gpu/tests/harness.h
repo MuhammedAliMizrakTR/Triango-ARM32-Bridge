@@ -7,6 +7,8 @@
 
 void test_proto(void);
 void test_roundtrip(void);
+void test_round2(void);
+void test_token(void);
 void test_struct_conv(void);
 
 #endif /* GPU_TESTS_HARNESS_H */

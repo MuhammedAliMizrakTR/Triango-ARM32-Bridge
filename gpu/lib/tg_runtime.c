@@ -131,6 +131,113 @@ int64_t tg_call(uint16_t op, const uint64_t *slots, uint32_t nslots,
 
 /* ============================ host side ============================ */
 
+void tg_token_map_init(tg_token_map *m)
+{
+	memset(m, 0, sizeof(*m));
+	m->ready = 1;
+}
+
+uint32_t tg_token_alloc(tg_token_map *m, uint64_t host_handle)
+{
+	uint32_t i;
+
+	if (!host_handle)
+		return 0;
+	if (!m->ready)
+		tg_token_map_init(m);
+	for (i = 0; i < TG_TOKEN_MAP_SIZE; i++)
+		if (m->host[i] == host_handle)
+			return i + 1;
+	for (i = 0; i < TG_TOKEN_MAP_SIZE; i++) {
+		uint32_t idx = (m->cursor + i) % TG_TOKEN_MAP_SIZE;
+
+		if (!m->host[idx]) {
+			m->host[idx] = host_handle;
+			m->cursor = (idx + 1) % TG_TOKEN_MAP_SIZE;
+			return idx + 1;
+		}
+	}
+	return 0;
+}
+
+uint64_t tg_token_resolve(const tg_token_map *m, uint32_t id)
+{
+	if (!id || id > TG_TOKEN_MAP_SIZE)
+		return 0;
+	return m->host[id - 1];
+}
+
+void tg_token_release(tg_token_map *m, uint32_t id)
+{
+	if (id && id <= TG_TOKEN_MAP_SIZE)
+		m->host[id - 1] = 0;
+}
+
+static uint32_t strarr_elem_len(const char *const *strs, const int32_t *lens,
+				uint32_t i)
+{
+	if (lens && lens[i] >= 0)
+		return (uint32_t)lens[i];
+	return strs[i] ? (uint32_t)strlen(strs[i]) : 0u;
+}
+
+uint32_t tg_pack_strings(uint8_t *dst, uint32_t cap, const char *const *strs,
+			 const int32_t *lens, uint32_t count)
+{
+	uint32_t i, need, off;
+
+	if (!strs || count > TGPU_STRARR_MAX)
+		return 0;
+	need = 4u + 4u * count;
+	for (i = 0; i < count; i++)
+		need += strarr_elem_len(strs, lens, i) + 1u;
+	if (!dst)
+		return need;
+	if (cap < need)
+		return 0;
+	memcpy(dst, &count, 4);
+	for (i = 0; i < count; i++) {
+		uint32_t li = strarr_elem_len(strs, lens, i);
+
+		memcpy(dst + 4u + 4u * i, &li, 4);
+	}
+	off = 4u + 4u * count;
+	for (i = 0; i < count; i++) {
+		uint32_t li = strarr_elem_len(strs, lens, i);
+
+		if (li && strs[i])
+			memcpy(dst + off, strs[i], li);
+		dst[off + li] = 0;
+		off += li + 1u;
+	}
+	return need;
+}
+
+uint32_t tg_unpack_strings(const uint8_t *src, uint32_t srclen,
+			   const char **ptrs, uint32_t max_ptrs)
+{
+	uint32_t count, i, off;
+
+	if (!src || srclen < 4u)
+		return 0;
+	memcpy(&count, src, 4);
+	if (!count || count > TGPU_STRARR_MAX || count > max_ptrs)
+		return 0;
+	if (srclen < 4u + 4u * count)
+		return 0;
+	off = 4u + 4u * count;
+	for (i = 0; i < count; i++) {
+		uint32_t li;
+
+		memcpy(&li, src + 4u + 4u * i, 4);
+		if (off + li + 1u > srclen)
+			return 0;
+		ptrs[i] = (const char *)(src + off);
+		off += li + 1u;
+	}
+	return count;
+}
+
 void tgpu_host_init(tgpu_host *h, const tgpu_host_fn_desc *tab, uint32_t n)
 {
 	memset(h, 0, sizeof(*h));
@@ -226,15 +333,65 @@ uint32_t tgpu_host_dispatch(tgpu_host *h, const void *req, uint32_t reqlen,
 	d = host_find(h, rq->op);
 	if (!d || !d->impl) {
 		st = TGPU_ST_ENOSYS;
+	} else if (nslots > TG_MAX_SLOTS) {
+		st = TGPU_ST_ERANGE;
 	} else {
 		uint32_t out_plen = plen;
 		uint32_t room = TGPU_MSG_MAX -
 				(uint32_t)((uint8_t *)payload - (uint8_t *)rq);
+		uint64_t sl[TG_MAX_SLOTS];
+		uint32_t i;
 
-		st = d->impl(h, slots, nslots, payload, plen, room, &ret,
+		/* Resolve guest handle ids -> host driver handles. */
+		memcpy(sl, slots, 8u * nslots);
+		if (!h->tok.ready)
+			tg_token_map_init(&h->tok);
+		for (i = 0; i < nslots; i++)
+			if (d->handle_args & (1u << i))
+				sl[i] = tg_token_resolve(&h->tok,
+							 (uint32_t)sl[i]);
+
+		st = d->impl(h, sl, nslots, payload, plen, room, &ret,
 			     &out_plen);
 		if (out_plen > plen)
 			plen = out_plen;
+
+		if (st == TGPU_ST_OK) {
+			/* Map host handles -> guest-visible ids. */
+			for (i = 0; i < nslots; i++) {
+				uint32_t off = (uint32_t)(sl[i] >> 32);
+				uint32_t len = (uint32_t)sl[i];
+				uint64_t v;
+				uint32_t e, ne;
+
+				if ((d->handle_out_slots & (1u << i)) &&
+				    off + 8u <= plen) {
+					memcpy(&v, payload + off, 8);
+					if (v) {
+						v = tg_token_alloc(&h->tok, v);
+						memcpy(payload + off, &v, 8);
+					}
+				}
+				if (d->handle_arr_slots & (1u << i)) {
+					ne = len / 8u;
+					for (e = 0; e < ne; e++) {
+						uint32_t p = off + 8u * e;
+
+						if (p + 8u > plen)
+							break;
+						memcpy(&v, payload + p, 8);
+						if (v) {
+							v = tg_token_alloc(&h->tok,
+									   v);
+							memcpy(payload + p, &v,
+							       8);
+						}
+					}
+				}
+			}
+			if (d->ret_is_handle && ret)
+				ret = tg_token_alloc(&h->tok, ret);
+		}
 	}
 
 	memset(rs, 0, sizeof(*rs));

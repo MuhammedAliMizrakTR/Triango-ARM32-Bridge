@@ -5,6 +5,8 @@
 # Payloads (built beforehand or provided via env):
 #   TRIANGO_BRIDGE  - AArch64 bridge binary (default: bridge/build/triango-bridge)
 #   TRIANGO_KO      - kernel module             (default: kernel/triango-bridge-lkm/triango_bridge.ko)
+#   TRIANGO_NB_LIB  - NativeBridge library      (default: nativebridge/prebuilt/libtriango_native_bridge.so)
+#   TRIANGO_GPUD    - GPU thunk daemon          (default: gpu/build/triango-gpud)
 # Missing payloads are skipped with a warning (the module then relies on the
 # binfmt_misc fallback / manual deployment).
 set -euo pipefail
@@ -14,6 +16,8 @@ STAGE="$ROOT/build/module-zip"
 DIST="$ROOT/dist"
 BRIDGE="${TRIANGO_BRIDGE:-$ROOT/bridge/build/triango-bridge}"
 KO="${TRIANGO_KO:-$ROOT/kernel/triango-bridge-lkm/triango_bridge.ko}"
+NBLIB="${TRIANGO_NB_LIB:-$ROOT/nativebridge/prebuilt/libtriango_native_bridge.so}"
+GPUD="${TRIANGO_GPUD:-$ROOT/gpu/build/triango-gpud}"
 
 VERSION="$(sed -n 's/^version=//p' "$ROOT/module/module.prop")"
 OUT="$DIST/triango-arm32-bridge-ksu.zip"
@@ -34,7 +38,25 @@ else
 	echo "warning: kernel module not found at '$KO' — packaging without it (binfmt_misc fallback only)" >&2
 fi
 
+# NativeBridge library -> system/lib64 (magic mount) + plain copy for the
+# soft-reboot activator (customize.sh stages it into /data/adb/triango/lib).
+if [[ -f "$NBLIB" ]]; then
+	mkdir -p "$STAGE/system/lib64"
+	cp "$NBLIB" "$STAGE/system/lib64/libtriango_native_bridge.so"
+	cp "$NBLIB" "$STAGE/libtriango_native_bridge.so"
+else
+	echo "warning: NativeBridge library not found at '$NBLIB' — build with tools/build-nativebridge.sh <ndk>" >&2
+fi
+
+# GPU thunk daemon.
+if [[ -f "$GPUD" ]]; then
+	cp "$GPUD" "$STAGE/triango-gpud"
+else
+	echo "warning: triango-gpud not found at '$GPUD' — GPU thunk mode unavailable" >&2
+fi
+
 chmod 755 "$STAGE/post-fs-data.sh" "$STAGE/service.sh" "$STAGE/uninstall.sh" \
+	"$STAGE/activate.sh" "$STAGE/customize.sh" \
 	"$STAGE/triango-bridge-lkm" 2>/dev/null || true
 [[ -f "$STAGE/triango-bridge" ]] && chmod 755 "$STAGE/triango-bridge"
 

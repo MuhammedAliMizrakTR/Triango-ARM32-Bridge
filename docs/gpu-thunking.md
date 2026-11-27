@@ -45,11 +45,15 @@ listeler, `gpu/gen_thunks.py` hem arm32 shim'ini hem arm64 dispatch'ini üretir.
 - Mesaj: `[hdr(16)][nslots × u64][payload]`.
 - **Slot kodlaması:** skaler/handle → 1×u64; string/buffer → `off<<32|len`
   (payload içinde kopya). Misafir işaretçileri asla kanaldan **geçmez**.
-- **Handle'lar** (EGLDisplay, VkInstance, …) sürücünün ürettiği jetonlardır;
-  süreçler arası geçerlidir. (arm32'te 4 baytlık handle'lar için jeton-eşleme
-  tablosu v0.2'de; bkz. §5.)
+- **Jeton-eşleme tablosu** (tur 2): driver handle'ları 64-bit'tir; misafir
+  (arm32) yalnızca 32-bit tutabilir. gpud tarafında `tg_token_map` her
+  driver handle'ı yoğun bir **32-bit id**'ye sarar (id 0 = NULL); argümanlar
+  id→handle, dönüşler handle→id olarak çevrilir. Böylece misafir kırpma
+  kayıpsızdır. `handle_array_out` için `elem: u32` (GL isimleri — jetonsuz)
+  ve `elem: u64` (EGL/Vulkan — jetonlu) ayrımı vardır.
 - Yanıt, istek payload'unu **yerinde** geri verir (buffer çıkışları host'ta
-  doldurulur, shim geri kopyalar); string dönüşleri payload sonuna eklenir.
+  doldurulur, shim geri kopyalar); string dönüşleri payload sonuna eklenir,
+  shim TLS arabelleğine kopyalar.
 
 ### 2.2 Sözleşme testleri (host üzerinde, CI'da)
 
@@ -94,16 +98,23 @@ Vulkan'ın zorluğu **struct düzeni**: `VkInstanceCreateInfo` vb. tüm
    Turnip**'i yükler. Turnip, Adreno 840'ı (SM8850) tanır — açık kaynak
    Vulkan yolu cihazda canlıdır.
 
-## 5. Bilinen sınırlar (v0 iskeleti) / Known limitations
+## 5. Bilinen sınırlar (tur 2 sonrası) / Known limitations
 
 | Konu | Durum | Plan |
 |---|---|---|
-| Handle genişliği (arm32 4 bayt vs host 8 bayt) | iskelet kırpıyor | gpud jeton-eşleme tablosu (v0.2) |
-| `glShaderSource`, `glReadPixels`, `eglChooseConfig` | JSON'da yok | sonraki üretim turu |
+| Handle genişliği (arm32 4 bayt vs host 8 bayt) | ✅ **jeton-eşleme tablosu** (tg_runtime: 64-bit driver handle ↔ 32-bit misafir id) | — |
+| `glShaderSource` (string dizisi) | ✅ `string_array` marshaller (`tg_pack_strings`) | — |
+| `glReadPixels`/`glTexImage2D`/`eglChooseConfig` | ✅ `len_expr` + `count_from` (skaler/buffer) | — |
+| GL isim dizileri (glGen* u32) vs EGL/Vulkan jetonları (u64) | ✅ `elem: u32/u64` ayrımı | — |
 | `VkInstanceCreateInfo` & pNext zinciri | `ENOTSUP` | struct_conv üreteci (v0.3) |
-| ANativeWindow / gralloc / BufferQueue | yok | EGL window surface'lar için gerekli; zygote32/ART (v0.3) ile birlikte |
+| ANativeWindow / gralloc / BufferQueue | yok | EGL window surface'lar için gerekli; NativeBridge/ART ile birlikte |
 | Periyodik/async olaylar (vkQueueSubmit completion) | sync kanal | genişletilmiş mesaj kuyruğu + callback jetonu |
 | Performans (roundtrip gecikmesi) | kabul edilebilir değil günlük için | JIT + yerinde komut tamponu (command buffer) biriktirme |
+
+Tur 2 kapsamı: EGL 27 giriş (configs/choose/pbuffer/query/swapinterval/…),
+GLES2 ~70 giriş (shader/uniform/doku/FBO/pixels/…), Vulkan 11 giriş
+(device queue/wait idle/…) — `make -C gpu test` 4098 kontrol, ASan/UBSan
+temiz.
 
 ## 6. Sınıflandırma: "dişli" nerede devreye giriyor?
 

@@ -14,14 +14,21 @@ The generator emits three C files:
 
 Argument types
 --------------
-  scalars   int32 uint32 int64 uint64 float double   -> one u64 slot each
-  handle    opaque pointer-sized token (EGLDisplay, VkInstance, ...)
-  string    const char*  -> payload copy (NUL included), slot = off<<32|len
-  buf_in    const void* + length (len_fixed / len_arg x len_scale)
-  buf_out   void* + length; mutated in place, copied back on response
+  scalars     int32 uint32 int64 uint32 float double  -> one u64 slot each
+  handle      opaque driver token (EGLDisplay, VkInstance, ...); guest side
+              sees a 32-bit id (token table maps ids <-> 64-bit handles)
+  string      const char*  -> payload copy (NUL included), slot = off<<32|len
+  string_array const char *const * + count_arg -> [u32 count][count*u32 len]
+              [blobs with NUL]; host rebuilds the pointer array
+  buf_in      const void* + length (len_fixed / len_arg x len_scale / len_expr)
+  buf_out     void* + length; mutated in place, copied back on response
   handle_out        void* out-slot for one handle (host writes u64)
-  handle_array_out  array of handles (count_fixed elems; host writes u64
-                    elements, guest copies back pointer-sized elements)
+  handle_array_out  array of handles (count_fixed max; capacity may come from
+                    count_from: a scalar arg or an in/out int32 buffer)
+
+A NULL buffer argument marshals to length 0 (and decodes to NULL on the
+host).  A non-NULL *out* argument whose data does not fit the stub payload
+fails fast with TGPU_ST_ERANGE.
 
 A function flagged "struct_conv": true needs 32<->64 struct conversion
 (VkInstanceCreateInfo & friends) and is emitted as TGPU_ST_ENOTSUP on the
@@ -35,7 +42,8 @@ import sys
 
 ARG_TYPES = {
     "int32", "uint32", "int64", "uint64", "float", "double", "handle",
-    "string", "buf_in", "buf_out", "handle_out", "handle_array_out",
+    "string", "string_array", "buf_in", "buf_out", "handle_out",
+    "handle_array_out",
 }
 RET_TYPES = {
     "void", "int32", "uint32", "int64", "uint64", "float", "double",
@@ -45,13 +53,15 @@ RET_TYPES = {
 C_TYPE = {
     "int32": "int32_t", "uint32": "uint32_t", "int64": "int64_t",
     "uint64": "uint64_t", "float": "float", "double": "double",
-    "handle": "void *", "string": "const char *", "buf_in": "const void *",
-    "buf_out": "void *", "handle_out": "void *",
+    "handle": "void *", "string": "const char *",
+    "string_array": "const char *const *",
+    "buf_in": "const void *", "buf_out": "void *", "handle_out": "void *",
     "handle_array_out": "void *",
 }
 
-PAYLOAD_TYPES = {"string", "buf_in", "buf_out", "handle_out",
+PAYLOAD_TYPES = {"string", "string_array", "buf_in", "buf_out", "handle_out",
                  "handle_array_out"}
+BUF_TYPES = {"buf_in", "buf_out", "handle_out", "handle_array_out"}
 
 
 def die(msg):
@@ -64,35 +74,56 @@ def load_defs(paths):
     for p in paths:
         with open(p) as f:
             api = json.load(f)
-        for key in ("api", "base", "functions"):
-            if key not in api:
-                die("%s: missing '%s'" % (p, key))
+        for k in ("api", "base", "functions"):
+            if k not in api:
+                die("%s: missing %r" % (p, k))
+        names = set()
         for fn in api["functions"]:
-            if fn.get("ret", "void") not in RET_TYPES:
-                die("%s: %s: bad ret type" % (p, fn.get("name")))
-            names = set()
+            if "name" not in fn:
+                die("%s: function without name" % p)
+            if fn["name"] in names:
+                die("%s: duplicate function %s" % (p, fn["name"]))
+            names.add(fn["name"])
+            ret = fn.get("ret", "void")
+            if ret not in RET_TYPES:
+                die("%s: %s: bad ret %r" % (p, fn["name"], ret))
+            argnames = set()
             for a in fn.get("args", []):
                 if a.get("type") not in ARG_TYPES:
-                    die("%s: %s: bad arg type %r" % (p, fn["name"], a))
-                if a["name"] in names:
-                    die("%s: %s: duplicate arg %s" % (p, fn["name"], a["name"]))
-                names.add(a["name"])
-                if a["type"] in ("buf_in", "buf_out"):
-                    if "len_fixed" not in a and "len_arg" not in a:
-                        die("%s: %s: %s needs len_fixed/len_arg" %
-                            (p, fn["name"], a["name"]))
-                if a["type"] == "handle_array_out" and "count_fixed" not in a:
+                    die("%s: %s: bad arg type %r" % (p, fn["name"],
+                                                     a.get("type")))
+                if a["name"] in argnames:
+                    die("%s: %s: duplicate arg %s" % (p, fn["name"],
+                                                      a["name"]))
+                argnames.add(a["name"])
+            for a in fn.get("args", []):
+                if (a["type"] == "handle_array_out" and
+                        "count_fixed" not in a):
                     die("%s: %s: handle_array_out needs count_fixed" %
                         (p, fn["name"]))
-                if a["type"] == "handle_array_out" and "count_from" in a:
-                    names_later = [x["name"] for x in fn.get("args", [])]
-                    if a["count_from"] not in names_later:
-                        die("%s: %s: count_from %r unknown" %
-                            (p, fn["name"], a["count_from"]))
-            for a in fn.get("args", []):
-                if "len_arg" in a and a["len_arg"] not in names:
+                if (a["type"] == "handle_array_out" and
+                        a.get("elem", "u64") not in ("u32", "u64")):
+                    die("%s: %s: handle_array_out elem must be u32/u64" %
+                        (p, fn["name"]))
+                if (a["type"] == "handle_array_out" and
+                        a.get("count_from") not in (None,) and
+                        a["count_from"] not in argnames):
+                    die("%s: %s: count_from %r unknown" %
+                        (p, fn["name"], a["count_from"]))
+                if a["type"] == "string_array" and \
+                        a.get("count_arg") not in argnames:
+                    die("%s: %s: string_array needs count_arg" %
+                        (p, fn["name"]))
+                if a["type"] == "string_array" and "len_arg" in a and \
+                        a["len_arg"] not in argnames:
                     die("%s: %s: len_arg %r unknown" %
                         (p, fn["name"], a["len_arg"]))
+                if a["type"] == "buf_in" or a["type"] == "buf_out":
+                    if not any(k in a for k in
+                               ("len_fixed", "len_arg", "len_expr")):
+                        die("%s: %s: %s needs len_fixed/len_arg/len_expr" %
+                            (p, fn["name"], a["name"]))
+        api["functions"] = list(api["functions"])
         apis.append(api)
     return apis
 
@@ -108,24 +139,51 @@ def guest_ret_type(ret):
     return C_TYPE[ret]
 
 
+def ret_c_expr(ret):
+    special = {"string": "const char *", "handle": "void *", "void": "void"}
+    if ret in special:
+        return special[ret]
+    return C_TYPE[ret]
+
+
 def payload_len_expr_guest(a):
-    """C expression for this arg's payload bytes, given stub parameter."""
     t = a["type"]
-    if t == "handle_out":
-        return "8u"
-    if t == "handle_array_out":
-        return "%du * 8u" % a["count_fixed"]
+    nm = a["name"]
+    if "len_expr" in a:
+        return "((%s) ? (uint32_t)(%s) : 0u)" % (nm, a["len_expr"])
     if t == "string":
-        return "(%s) ? (uint32_t)strlen(%s) + 1u : 0u" % (a["name"], a["name"])
-    # buf_in / buf_out
-    if "len_fixed" in a:
-        base = "%du" % a["len_fixed"]
-    else:
-        scale = a.get("len_scale", 1)
-        base = ("((int64_t)(%s) > 0 ? "
-                "(uint32_t)((uint64_t)(%s) * %du) : 0u)"
-                % (a["len_arg"], a["len_arg"], scale))
-    return "((%s) ? (%s) : 0u)" % (a["name"], base)
+        return "((%s) ? (uint32_t)strlen(%s) + 1u : 0u)" % (nm, nm)
+    if t in ("buf_in", "buf_out", "handle_out"):
+        if "len_fixed" in a:
+            base = "%du" % a["len_fixed"]
+        elif "len_arg" in a:
+            base = "(uint32_t)(%s) * %du" % (a["len_arg"],
+                                             a.get("len_scale", 1))
+        else:
+            die("buffer arg %s needs len_fixed/len_arg/len_expr" % nm)
+        return "((%s) ? %s : 0u)" % (nm, base)
+    if t == "handle_array_out":
+        return "unused"  # handled with statements
+    die("no len expr for %s" % t)
+
+
+def handle_meta(fn):
+    """(handle_args_mask, handle_out_mask, handle_arr_mask, ret_is_handle)
+
+    handle_arr_mask marks only 8-byte-element arrays (EGL/Vulkan tokens);
+    4-byte GL object names pass through unmapped.
+    """
+    ha = ho = har = 0
+    for i, a in enumerate(fn.get("args", [])):
+        if a["type"] == "handle":
+            ha |= 1 << i
+        elif a["type"] == "handle_out":
+            ho |= 1 << i
+        elif (a["type"] == "handle_array_out" and
+              a.get("elem", "u64") == "u64"):
+            har |= 1 << i
+    rh = 1 if fn.get("ret", "void") == "handle" else 0
+    return ha, ho, har, rh
 
 
 def emit_guest_fn(f, api, fn):
@@ -139,7 +197,7 @@ def emit_guest_fn(f, api, fn):
     f.write("\tuint64_t slots[%d];\n" % max(n, 1))
     if n == 0:
         f.write("\tslots[0] = 0;\n")
-    f.write("\tstatic uint8_t payload[TGPU_STUB_PAYLOAD];\n")
+    f.write("\tuint8_t payload[TGPU_STUB_PAYLOAD] = { 0 };\n")
     f.write("\tuint8_t outp[TGPU_STUB_PAYLOAD];\n")
     f.write("\tuint32_t poff = 0, outlen = 0;\n")
     f.write("\tint32_t status = 0;\n")
@@ -147,7 +205,8 @@ def emit_guest_fn(f, api, fn):
     for i, a in enumerate(args):
         if a["type"] in PAYLOAD_TYPES:
             f.write("\tuint32_t off%d = 0, l%d = 0;\n" % (i, i))
-    f.write("\n")
+    if ret != "void":
+        f.write("\t(void)status;\n")
 
     for i, a in enumerate(args):
         t, nm = a["type"], a["name"]
@@ -162,93 +221,114 @@ def emit_guest_fn(f, api, fn):
         elif t == "handle":
             f.write("\tslots[%d] = (uint64_t)(uintptr_t)(%s);\n" % (i, nm))
         else:
-            # Keep payload offsets 8-aligned: buffer payloads may carry
-            # 8-byte elements (handles) on the host side.
+            # Payload argument: keep offsets 8-aligned for handle arrays.
             f.write("\tpoff = (poff + 7u) & ~7u;\n")
             f.write("\toff%d = poff;\n" % i)
             if t == "handle_array_out":
+                esz = 4 if a.get("elem", "u64") == "u32" else 8
+                f.write("\t{\n")
+                f.write("\t\tuint32_t ne_in;\n")
                 cnt = a.get("count_from")
                 if cnt:
-                    f.write("\t{\n\t\tint32_t ne_in = (%s) ? "
-                            "*(const int32_t *)(%s) : 0;\n"
-                            % (cnt, cnt))
-                    f.write("\t\tif (ne_in < 0) ne_in = 0;\n")
-                    f.write("\t\tif (ne_in > %d) ne_in = %d;\n"
-                            % (a["count_fixed"], a["count_fixed"]))
-                    f.write("\t\tl%d = (uint32_t)ne_in * 8u;\n\t}\n" % i)
+                    cta = next((x for x in args if x["name"] == cnt), None)
+                    if cta and cta["type"] in ("int32", "uint32", "int64",
+                                               "uint64"):
+                        f.write("\t\tne_in = (uint32_t)(%s);\n" % cnt)
+                    else:
+                        f.write("\t\tne_in = (%s) ? (uint32_t)"
+                                "(*(const int32_t *)(%s)) : 0u;\n"
+                                % (cnt, cnt))
                 else:
-                    f.write("\tl%d = %du * 8u;\n" % (i, a["count_fixed"]))
+                    f.write("\t\tne_in = %du;\n" % a["count_fixed"])
+                f.write("\t\tif (!(%s)) ne_in = 0;\n" % nm)
+                f.write("\t\tif (ne_in > %du) ne_in = %du;\n"
+                        % (a["count_fixed"], a["count_fixed"]))
+                f.write("\t\tl%d = ne_in * %du;\n" % (i, esz))
+                f.write("\t}\n")
+            elif t == "string_array":
+                f.write("\tl%d = tg_pack_strings(NULL, 0, %s, %s, "
+                        "(uint32_t)(%s));\n"
+                        % (i, nm, a.get("len_arg", "NULL"),
+                           a["count_arg"]))
             else:
                 f.write("\tl%d = %s;\n" % (i, payload_len_expr_guest(a)))
-            f.write("\tif (poff + l%d > TGPU_STUB_PAYLOAD) l%d = 0;\n" % (i, i))
-            if t == "string":
-                f.write("\tif (%s && l%d) memcpy(payload + off%d, %s, l%d);\n"
-                        % (nm, i, i, nm, i))
-            elif t == "buf_in":
-                f.write("\tif (%s && l%d) memcpy(payload + off%d, %s, l%d);\n"
-                        % (nm, i, i, nm, i))
-            else:  # buf_out / handle_out / handle_array_out
-                f.write("\tif (l%d) memset(payload + off%d, 0, l%d);\n"
-                        % (i, i, i))
+            f.write("\tif (poff + l%d > TGPU_STUB_PAYLOAD) l%d = 0;\n"
+                    % (i, i))
+            if t in ("buf_out", "handle_out", "handle_array_out",
+                     "string_array"):
+                # Never let the driver write through a NULL out pointer or
+                # an unmarshalled string array.
+                f.write("\tif ((%s) && !l%d) return %s;\n"
+                        % (nm, i, "(%s)TGPU_ST_ERANGE" % C_TYPE[ret]
+                           if ret != "void" else ""))
+            if t == "string_array":
+                f.write("\ttg_pack_strings(payload + off%d, l%d, %s, %s, "
+                        "(uint32_t)(%s));\n"
+                        % (i, i, nm, a.get("len_arg", "NULL"),
+                           a["count_arg"]))
+            elif t == "string":
+                f.write("\tif (l%d) memcpy(payload + off%d, %s, l%d);\n"
+                        % (i, i, nm, i))
+            else:
+                f.write("\tif (l%d) memcpy(payload + off%d, %s, l%d);\n"
+                        % (i, i, nm, i))
+            f.write("\tpoff += l%d;\n" % i)
             f.write("\tslots[%d] = ((uint64_t)off%d << 32) | l%d;\n"
                     % (i, i, i))
-            f.write("\tpoff += l%d;\n" % i)
 
     f.write("\trv = tg_call(%s, slots, %d, payload, poff, outp, "
             "sizeof(outp), &outlen, &status);\n" % (op_name(api, fn), n))
     if ret in ("int32", "int64"):
-        # Integer returns propagate negative transport/dispatch status
-        # codes (e.g. TGPU_ST_ENOTSUP for struct_conv functions).
         f.write("\tif (status < 0) return (%s)status;\n" % C_TYPE[ret])
-    else:
-        f.write("\t(void)status;\n")
+    elif ret != "void":
+        f.write("\tif (rv < 0) return (%s)0;\n" % ret_c_expr(ret))
 
     for i, a in enumerate(args):
-        t, nm = a["type"], a["name"]
-        if t == "buf_out":
-            f.write("\tif (%s && l%d && outlen >= off%d + l%d) "
-                    "memcpy(%s, outp + off%d, l%d);\n"
-                    % (nm, i, i, i, nm, i, i))
-        elif t == "handle_out":
-            f.write("\tif (%s && outlen >= off%d + sizeof(void *)) "
-                    "memcpy(%s, outp + off%d, sizeof(void *));\n"
-                    % (nm, i, nm, i))
+        t = a["type"]
+        if t in ("buf_out", "handle_out"):
+            f.write("\tif (l%d && %s) memcpy(%s, outp + off%d, l%d);\n"
+                    % (i, a["name"], a["name"], i, i))
         elif t == "handle_array_out":
-            f.write("\tif (%s) {\n" % nm)
-            f.write("\t\tuint32_t e_, ne_ = l%d / 8u;\n" % i)
-            f.write("\t\tfor (e_ = 0; e_ < ne_ && outlen >= off%d + "
-                    "(e_ + 1u) * 8u; e_++) {\n" % i)
-            f.write("\t\t\tvoid *hv_;\n")
-            f.write("\t\t\tmemcpy(&hv_, outp + off%d + e_ * 8u, 8);\n" % i)
-            f.write("\t\t\tmemcpy((uint8_t *)(%s) + e_ * sizeof(void *), "
-                    "&hv_, sizeof(void *));\n" % nm)
-            f.write("\t\t}\n\t}\n")
+            if a.get("elem", "u64") == "u32":
+                # GL object names: identical u32 layout both sides.
+                f.write("\tif (l%d && %s) memcpy(%s, outp + off%d, l%d);\n"
+                        % (i, a["name"], a["name"], i, i))
+            else:
+                f.write("\tif (%s) {\n" % a["name"])
+                f.write("\t\tuint32_t e;\n")
+                f.write("\t\tfor (e = 0; e < l%d / 8u; e++) {\n" % i)
+                f.write("\t\t\tuint64_t hv_;\n")
+                f.write("\t\t\tmemcpy(&hv_, outp + off%d + 8u * e, 8);\n" % i)
+                f.write("\t\t\tmemcpy((uint8_t *)(%s) + e * sizeof(void *), "
+                        "&hv_, sizeof(void *));\n" % a["name"])
+                f.write("\t\t}\n\t}\n")
 
     if ret == "void":
         f.write("\t(void)rv;\n")
     elif ret == "string":
-        f.write("\t{\n\t\tstatic char sbuf[TGU_STRING_RET_MAX];\n")
-        f.write("\t\tuint32_t sl = (uint32_t)rv;\n")
-        f.write("\t\tif (sl && outlen >= poff + sl) {\n")
-        f.write("\t\t\tif (sl > sizeof(sbuf)) sl = sizeof(sbuf);\n")
-        f.write("\t\t\tmemcpy(sbuf, outp + poff, sl);\n")
-        f.write("\t\t\tsbuf[sizeof(sbuf) - 1] = 0;\n")
-        f.write("\t\t\treturn sbuf;\n\t\t}\n\t\treturn NULL;\n\t}\n")
+        f.write("\tif (status < 0 || !rv) return NULL;\n")
+        f.write("\t{\n\t\tuint32_t soff = (uint32_t)((uint64_t)rv >> 32);\n")
+        f.write("\t\tuint32_t slen = (uint32_t)(uint64_t)rv;\n")
+        f.write("\t\tif (soff + slen > outlen || !slen) return NULL;\n")
+        f.write("\t\tif (slen > TGU_STRING_RET_MAX) "
+                "slen = TGU_STRING_RET_MAX;\n")
+        f.write("\t\tmemcpy(g_tgu_str_ret, outp + soff, slen);\n")
+        f.write("\t\tg_tgu_str_ret[TGU_STRING_RET_MAX - 1] = 0;\n")
+        f.write("\t\treturn g_tgu_str_ret;\n\t}\n")
     elif ret == "handle":
-        f.write("\treturn (void *)(uintptr_t)rv;\n")
-    elif ret in ("float",):
+        f.write("\treturn (void *)(uintptr_t)(uint64_t)rv;\n")
+    elif ret == "float":
         f.write("\treturn tg_slot_f32((uint64_t)rv);\n")
-    elif ret in ("double",):
+    elif ret == "double":
         f.write("\treturn tg_slot_f64((uint64_t)rv);\n")
-    elif ret in ("int32", "int64"):
-        f.write("\treturn (%s)rv;\n" % C_TYPE[ret])
     else:
         f.write("\treturn (%s)rv;\n" % C_TYPE[ret])
     f.write("}\n\n")
 
 
-def host_call_expr(a, i):
+def host_call_expr(a, i, unpacked):
     t = a["type"]
+    nm = a["name"]
     if t in ("int32", "int64"):
         return "(%s)slots[%d]" % (C_TYPE[t], i)
     if t in ("uint32", "uint64"):
@@ -260,9 +340,13 @@ def host_call_expr(a, i):
     if t == "handle":
         return "(void *)(uintptr_t)slots[%d]" % i
     if t == "string":
-        return "(const char *)(payload + (slots[%d] >> 32))" % i
-    # buf_in / buf_out / handle_out / handle_array_out
-    return "(void *)(payload + (slots[%d] >> 32))" % i
+        return ("((slots[%d] & 0xffffffffu) ? (const char *)(payload + "
+                "(slots[%d] >> 32)) : NULL)" % (i, i))
+    if t == "string_array":
+        return "(const char *const *)%s" % unpacked[i]
+    # buf_in / buf_out / handle_out / handle_array_out: len 0 decodes NULL
+    return ("((slots[%d] & 0xffffffffu) ? (void *)(payload + "
+            "(slots[%d] >> 32)) : NULL)" % (i, i))
 
 
 def emit_host_fn(f, api, fn):
@@ -289,20 +373,32 @@ def emit_host_fn(f, api, fn):
             f.write("\tif ((slots[%d] >> 32) + (slots[%d] & 0xffffffffu) "
                     "> plen) return TGPU_ST_ERANGE;\n" % (i, i))
 
+    unpacked = {}
+    for i, a in enumerate(args):
+        if a["type"] == "string_array":
+            v = "sa%d" % i
+            unpacked[i] = v
+            f.write("\tconst char *%s[TGPU_STRARR_MAX];\n" % v)
+            f.write("\tuint32_t ca%d = tg_unpack_strings(payload + "
+                    "(slots[%d] >> 32), (uint32_t)slots[%d], %s, "
+                    "TGPU_STRARR_MAX);\n" % (i, i, i, v))
+            f.write("\tif (!ca%d && (slots[%d] & 0xffffffffu) > 4u) "
+                    "return TGPU_ST_ERANGE;\n" % (i, i))
+
     host_types = ", ".join(
-        ("const char *" if a["type"] == "string" else
+        ("const char *const *" if a["type"] == "string_array" else
+         "const char *" if a["type"] == "string" else
          "const void *" if a["type"] == "buf_in" else
          "void *" if a["type"] in ("handle", "buf_out", "handle_out",
                                    "handle_array_out") else
          C_TYPE[a["type"]]) for a in args)
-    special_ret = {"string": "const char *", "handle": "void *",
-                   "void": "void"}
-    rt = special_ret[ret] if ret in special_ret else C_TYPE[ret]
+    rt = ret_c_expr(ret)
     f.write("\ttypedef %s (*fn_t)(%s);\n" % (rt, host_types or "void"))
     f.write("\tfn_t fn = (fn_t)tgpu_host_resolve(h, \"%s\");\n" % cname)
     f.write("\tif (!fn) return TGPU_ST_ENOSYM;\n")
 
-    call_args = ", ".join(host_call_expr(a, i) for i, a in enumerate(args))
+    call_args = ", ".join(host_call_expr(a, i, unpacked)
+                          for i, a in enumerate(args))
     call = "fn(%s)" % call_args
 
     if ret == "void":
@@ -365,6 +461,8 @@ def generate(apis, outdir):
         f.write("/* Generated by gen_thunks.py — guest stubs. */\n")
         f.write("#include \"thunks_gen.h\"\n")
         f.write("#include <string.h>\n\n")
+        f.write("/* TLS buffer backing string returns (glGetString etc.). */\n")
+        f.write("static __thread char g_tgu_str_ret[TGU_STRING_RET_MAX];\n\n")
         for api in apis:
             f.write("/* ---- %s ---- */\n\n" % api["api"])
             for fn in api["functions"]:
@@ -382,9 +480,11 @@ def generate(apis, outdir):
         f.write("const tgpu_host_fn_desc tg_thunk_table[] = {\n")
         for api in apis:
             for fn in api["functions"]:
-                f.write("\t{ %s, \"%s\", impl_%s_%s },\n"
+                ha, ho, har, rh = handle_meta(fn)
+                f.write("\t{ %s, \"%s\", impl_%s_%s, 0x%xu, 0x%xu, 0x%xu, "
+                        "%d },\n"
                         % (op_name(api, fn), fn["name"], api["api"],
-                           fn["name"]))
+                           fn["name"], ha, ho, har, rh))
         f.write("};\n\n")
         f.write("const uint32_t tg_thunk_table_len = "
                 "sizeof(tg_thunk_table) / sizeof(tg_thunk_table[0]);\n")

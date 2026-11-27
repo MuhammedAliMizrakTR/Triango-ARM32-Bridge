@@ -1,11 +1,14 @@
-# Triango ARM32 Bridge — SELinux additions (Magisk/KernelSU sepolicy.rule).
+# SPDX-License-Identifier: MIT
+# Triango ARM32 Bridge — SELinux additions (v1.0).
 #
-# ksud applies these on boot / late-load. Keep this list minimal; Triango is
-# designed to work under enforcing. Rules that fail to load (unknown types on
-# a given build) are ignored by the policy tool.
-#
-# 1) The setup scripts mount binfmt_misc and register a handler.
-allow { magisk kernel } tmpfs filesystem { mount getattr }
-# 2) Executing the AArch64 bridge and its engine from /data/adb/triango.
-allow { magisk kernel } adb_data_file dir { search read open getattr }
-allow { magisk kernel } adb_data_file file { read open execute getattr map }
+# zygote must read the native bridge library and the Triango state dir.
+# KernelSU applies these on top of the device policy.
+
+# Read the bridge .so and config from /data/adb/triango.
+allow zygote { adb_data_file }:dir { getattr search open read };
+allow zygote { adb_data_file }:file { getattr open read map execute };
+allow system_server { adb_data_file }:dir { getattr search open read };
+allow system_server { adb_data_file }:file { getattr open read };
+
+# gpud accesses /dev/kgsl-3d0 (Adreno) for the GPU thunk daemon.
+allow untrusted_app { gpu_device }:chr_file { getattr open read write ioctl };

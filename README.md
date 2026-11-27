@@ -119,19 +119,27 @@ Sistem geneli ABI prop'ları (abilist32) modülle otomatik açılır; tek
 kurulumluk geçici çözüm: `tools/pm-install-arm32.sh`. Ayrıntılar:
 [`docs/abi-fix.md`](docs/abi-fix.md).
 
-## Durum / Status (v0.2-dev)
+## NativeBridge modülü v1.0 (WebUI · soft reboot)
+
+`libtriango_native_bridge.so` (Android NativeBridge v6) + KSU modülü:
+**LateLoad uyumlu**, **soft reboot ile aktive olur** (tam yeniden başlatma
+gerekmez), **KernelSU WebUI** (durum kartları, tek dokunuşla aktivasyon,
+günlük görüntüleyici). Motor eklentisi ABI'si hazır; ayrıntılar:
+[`docs/nativebridge.md`](docs/nativebridge.md).
+
+## Durum / Status (v1.0.0)
 
 | Bileşen | Durum |
 |---|---|
-| `triango_bridge.ko` (binfmt yakalama, GKI 6.12 uyumlu) | ✅ kaynak hazır, CI'da derlenir |
+| `triango_bridge.ko` (binfmt yakalama, GKI 6.12 uyumlu) | ✅ CI'da derlenir |
 | `triango-bridge` (ELF32 yükleyici, argv sözleşmesi, motor arayüzü) | ✅ + host birim testleri |
 | `qemu-arm` motor entegrasyonu | ✅ argv kurulumu hazır (motor binary'si harici) |
-| GPU dişli katmanı (GLES/Vulkan thunk + protokol + gpud iskeleti) | ✅ `make -C gpu test` (4000+ kontrol) |
+| GPU dişli katmanı (thunk üretici + protokol + jeton tablosu + gpud) | ✅ `make -C gpu test` (4098 kontrol) |
 | GPU normal mod (doğrudan arm32 blob geçişi) | ✅ tasarım + sysroot32 yerleşimi hazır |
 | `INSTALL_FAILED_NO_MATCHING_ABIS` çözümü (abilist32) | ✅ modülde (post-fs-data resetprop + system.prop) |
+| NativeBridge (libtriango_native_bridge, v6 arayüz + WebUI + soft reboot) | ✅ v1.0 — motor eklentisi 🗺️ |
+| KernelSU / BakaSU modül paketi (WebUI'li) | ✅ v1.0.0 |
 | Triango JIT motoru (arm32→arm64) | 🚧 iskelet (`docs/roadmap.md`) |
-| KernelSU / BakaSU modül paketi | ✅ |
-| APK/zygote32 (uygulama düzeyi tam destek, NativeBridge) | 🗺️ yol haritasında (v0.3) |
 
 ## Güvenlik / Safety
 

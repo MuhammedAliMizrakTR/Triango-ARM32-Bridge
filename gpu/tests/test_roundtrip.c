@@ -18,6 +18,8 @@ static float fr, fg, fb, fa;
 static uint8_t last_data[256];
 static uint32_t last_data_len;
 static int32_t last_size;
+/* Captured (resolved) handle arguments — proves the token table. */
+static uint64_t cap_dpy, cap_dpy_swap, cap_surface, cap_queue_arg, cap_dev;
 
 static void *fake_eglGetDisplay(void *id)
 {
@@ -27,7 +29,7 @@ static void *fake_eglGetDisplay(void *id)
 
 static int32_t fake_eglInitialize(void *dpy, void *major, void *minor)
 {
-	(void)dpy;
+	cap_dpy = (uint64_t)(uintptr_t)dpy;
 	if (major)
 		*(int32_t *)major = 1;
 	if (minor)
@@ -37,9 +39,40 @@ static int32_t fake_eglInitialize(void *dpy, void *major, void *minor)
 
 static int32_t fake_eglSwapBuffers(void *dpy, void *surface)
 {
-	(void)dpy;
-	(void)surface;
+	cap_dpy_swap = (uint64_t)(uintptr_t)dpy;
+	cap_surface = (uint64_t)(uintptr_t)surface;
 	return 1;
+}
+
+static void *fake_eglCreatePbufferSurface(void *dpy, void *config,
+					  const void *attrib_list)
+{
+	(void)dpy;
+	(void)config;
+	(void)attrib_list;
+	return (void *)(uintptr_t)0x5EA0FACEull;
+}
+
+static int32_t fake_vkQueueWaitIdle(void *queue)
+{
+	cap_queue_arg = (uint64_t)(uintptr_t)queue;
+	return 0;
+}
+
+static int32_t fake_vkDeviceWaitIdle(void *device)
+{
+	cap_dev = (uint64_t)(uintptr_t)device;
+	return 0;
+}
+
+static void fake_vkGetDeviceQueue(void *device, uint32_t fam, uint32_t idx,
+				  void *pQueue)
+{
+	(void)device;
+	(void)fam;
+	(void)idx;
+	if (pQueue)
+		*(uint64_t *)pQueue = 0x9D00BEEFull;
 }
 
 static void fake_glClearColor(float r, float g, float b, float a)
@@ -139,15 +172,31 @@ void test_roundtrip(void)
 	tgpu_host_set_fn(&g_host,
 			 TGPU_OP_VULKAN_VKENUMERATEPHYSICALDEVICES,
 			 (void *)fake_vkEnumeratePhysicalDevices);
+	tgpu_host_set_fn(&g_host, TGPU_OP_VULKAN_VKQUEUEWAITIDLE,
+			 (void *)fake_vkQueueWaitIdle);
+	tgpu_host_set_fn(&g_host, TGPU_OP_VULKAN_VKDEVICEWAITIDLE,
+			 (void *)fake_vkDeviceWaitIdle);
+	tgpu_host_set_fn(&g_host, TGPU_OP_VULKAN_VKGETDEVICEQUEUE,
+			 (void *)fake_vkGetDeviceQueue);
+	tgpu_host_set_fn(&g_host, TGPU_OP_EGL_EGLCREATEPBUFFERSURFACE,
+			 (void *)fake_eglCreatePbufferSurface);
 
-	/* handle in/out + scalar out buffers (EGL). */
+	/*
+	 * handle in/out + scalar out buffers (EGL).  Guest-visible handles
+	 * are token-table ids (small); the host sees the real 64-bit
+	 * driver handles.
+	 */
 	dpy = eglGetDisplay(NULL);
-	CHECK_EQ_INT((uintptr_t)dpy, 0xE61D15ull);
+	CHECK(dpy != NULL);
 	rv = eglInitialize(dpy, &major, &minor);
 	CHECK_EQ_INT(rv, 1);
+	CHECK_EQ_INT(cap_dpy, 0xE61D15ull); /* id resolved back to host handle */
 	CHECK_EQ_INT(major, 1);
 	CHECK_EQ_INT(minor, 4);
-	CHECK_EQ_INT(eglSwapBuffers(dpy, (void *)(uintptr_t)0x5u), 1);
+	CHECK_EQ_INT(eglSwapBuffers(dpy, eglCreatePbufferSurface(dpy, NULL,
+								 NULL)), 1);
+	CHECK_EQ_INT(cap_dpy_swap, 0xE61D15ull);
+	CHECK_EQ_INT(cap_surface, 0x5EA0FACEull);
 
 	/* float slots (GLES2). */
 	glClearColor(0.25f, 0.5f, 0.75f, 1.0f);
@@ -179,8 +228,11 @@ void test_roundtrip(void)
 	CHECK_EQ_INT(rv, 0);
 	CHECK_EQ_INT(ver, 0x00403000u);
 	{
-		/* handle_array_out copy-back writes pointer-sized elements;
-		 * the in/out count parameter caps the capacity (4 here). */
+		/*
+		 * handle_array_out (u64 elements): guest receives token ids
+		 * and can round-trip them back — vkDeviceWaitIdle(arr[0])
+		 * must arrive as the original host handle 0x9D000001.
+		 */
 		void *arr[4];
 		uint32_t cnt = 4;
 
@@ -189,8 +241,24 @@ void test_roundtrip(void)
 						arr);
 		CHECK_EQ_INT(rv, 0);
 		CHECK_EQ_INT(cnt, 2);
-		CHECK_EQ_INT((uintptr_t)arr[0], 0x9D000001ull);
-		CHECK_EQ_INT((uintptr_t)arr[1], 0x9D000002ull);
+		CHECK(arr[0] != NULL);
+		CHECK(arr[1] != NULL);
+		CHECK(arr[0] != arr[1]);
+		rv = vkDeviceWaitIdle(arr[0]);
+		CHECK_EQ_INT(rv, 0);
+		CHECK_EQ_INT(cap_dev, 0x9D000001ull);
+		rv = vkDeviceWaitIdle(arr[1]);
+		CHECK_EQ_INT(cap_dev, 0x9D000002ull);
+	}
+
+	{
+		/* handle_out (vkGetDeviceQueue pQueue) -> id -> resolved. */
+		void *q = NULL;
+
+		vkGetDeviceQueue((void *)(uintptr_t)0xD0DEull, 0, 0, &q);
+		CHECK(q != NULL);
+		CHECK_EQ_INT(vkQueueWaitIdle(q), 0);
+		CHECK_EQ_INT(cap_queue_arg, 0x9D00BEEFull);
 	}
 
 	/* struct_conv functions answer ENOTSUP until converters land. */

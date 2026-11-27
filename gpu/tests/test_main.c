@@ -7,7 +7,9 @@ int tb_test_checks = 0;
 int main(void)
 {
 	test_proto();
+	test_token();
 	test_roundtrip();
+	test_round2();
 	test_struct_conv();
 
 	printf("checks: %d, failures: %d\n", tb_test_checks, tb_test_fails);

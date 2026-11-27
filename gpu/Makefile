@@ -21,8 +21,8 @@ GEN_HDRS := $(GEN)/thunks_gen.h
 LIB_SRCS := lib/proto.c lib/tg_runtime.c
 CONV_SRCS := struct_conv/vk_structs.c
 
-TEST_SRCS := tests/test_main.c tests/test_proto.c tests/test_roundtrip.c \
-	tests/test_struct_conv.c
+TEST_SRCS := tests/test_main.c tests/test_proto.c tests/test_token.c \
+	tests/test_roundtrip.c tests/test_round2.c tests/test_struct_conv.c
 
 .PHONY: all test gpud clean
 
