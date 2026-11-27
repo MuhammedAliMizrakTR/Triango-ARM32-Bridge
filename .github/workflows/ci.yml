@@ -56,8 +56,13 @@ jobs:
         if: steps.cache-kernel.outputs.cache-hit != 'true'
         run: |
           make -C kernel-common ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- olddefconfig
-          make -C kernel-common ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- modules_prepare \
-            || { echo "::error::modules_prepare failed"; make -C kernel-common ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- modules_prepare V=1 2>&1 | tail -40; exit 2; }
+          if ! make -C kernel-common ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- modules_prepare; then
+            err=$(make -C kernel-common ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- modules_prepare V=1 2>&1 | tail -25)
+            err="${err//'%'/'%25'}"
+            err="${err//$'\n'/'%0A'}"
+            echo "::error::modules_prepare failed. tail: $err"
+            exit 2
+          fi
       - name: Build triango_bridge.ko
         run: ./kernel/triango-bridge-lkm/build.sh "$GITHUB_WORKSPACE/kernel-common"
       - name: Build bridge (aarch64)
