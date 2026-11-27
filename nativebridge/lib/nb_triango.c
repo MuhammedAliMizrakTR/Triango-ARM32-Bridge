@@ -66,11 +66,14 @@ static bool nb_initialize(const NativeBridgeRuntimeCallbacks *runtime_cbs,
 		set_error("triango: initialize: no instruction set");
 		return false;
 	}
-	if (strcmp(instruction_set, "armeabi-v7a") &&
-	    strcmp(instruction_set, "armeabi") && strcmp(instruction_set, "arm")) {
-		set_error("triango: unsupported instruction set");
-		return false;
-	}
+	/*
+	 * v1.2.2-b — Android 17 root cause: ART passes the HOST instruction
+	 * set here (GetInstructionSetString(kRuntimeISA) -> "arm64" on aarch64
+	 * devices), NOT the guest one.  v1.2.1-b rejected anything but
+	 * armeabi*, so initialize() failed for every app and the bridge never
+	 * came up.  Accept any non-empty ISA; the guest ABI is enforced
+	 * per-library in nb_is_supported() (ARM ELF gate).
+	 */
 	if (!g_initialized) {
 		g_rt = runtime_cbs;
 		snprintf(g_private_dir, sizeof(g_private_dir), "%s",
@@ -144,9 +147,10 @@ static const NativeBridgeRuntimeValues *nb_getAppEnv(
 
 	if (!instruction_set)
 		return NULL;
-	if (strcmp(instruction_set, "armeabi-v7a") &&
-	    strcmp(instruction_set, "armeabi") && strcmp(instruction_set, "arm"))
-		return NULL;
+	/*
+	 * v1.2.2-b — ART calls this with the HOST ISA ("arm64").  The values
+	 * describe the GUEST (arm32) environment regardless.
+	 */
 	return &env;
 }
 

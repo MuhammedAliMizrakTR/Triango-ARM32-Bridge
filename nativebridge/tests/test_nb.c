@@ -92,7 +92,10 @@ static void test_app_env(void)
 		CHECK_EQ(env->abi_count, 2);
 	}
 	CHECK(NativeBridgeItf.getAppEnv("armeabi") != NULL);
-	CHECK(NativeBridgeItf.getAppEnv("x86") == NULL);
+	/* v1.2.2-b: ART passes the HOST ISA ("arm64"/"x86_64" on real devices,
+	 * see Android 17 runtime.cc InitNonZygoteOrPostFork) — accepted. */
+	CHECK(NativeBridgeItf.getAppEnv("arm64") != NULL);
+	CHECK(NativeBridgeItf.getAppEnv("x86") != NULL);
 	CHECK(NativeBridgeItf.getAppEnv(NULL) == NULL);
 }
 
@@ -109,7 +112,11 @@ static void test_gating(void)
 static void test_init_gate(void)
 {
 	triango_nb_reset();
-	CHECK(!NativeBridgeItf.initialize(NULL, NULL, "x86"));
+	/* v1.2.2-b: host ISA accepted (Android 17 passes kRuntimeISA). */
+	CHECK(NativeBridgeItf.initialize(NULL, NULL, "arm64"));
+	/* Empty/NULL instruction set still rejected. */
+	triango_nb_reset();
+	CHECK(!NativeBridgeItf.initialize(NULL, NULL, ""));
 	CHECK(!NativeBridgeItf.initialize(NULL, NULL, NULL));
 	CHECK(NativeBridgeItf.initialize(NULL, "/data/local/tmp",
 					 "armeabi-v7a"));
