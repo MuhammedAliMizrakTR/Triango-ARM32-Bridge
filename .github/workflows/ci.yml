@@ -27,7 +27,8 @@ jobs:
       - name: Install build deps
         run: |
           sudo apt-get update
-          sudo apt-get install -y flex bison libssl-dev bc gcc-aarch64-linux-gnu
+          sudo apt-get install -y flex bison libssl-dev bc libelf-dev pkg-config \
+            dwarves python3 gcc-aarch64-linux-gnu
       - name: Cache GKI kernel tree
         id: cache-kernel
         uses: actions/cache@v4
@@ -55,7 +56,8 @@ jobs:
         if: steps.cache-kernel.outputs.cache-hit != 'true'
         run: |
           make -C kernel-common ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- olddefconfig
-          make -C kernel-common ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- modules_prepare
+          make -C kernel-common ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- modules_prepare \
+            || { echo "::error::modules_prepare failed"; make -C kernel-common ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- modules_prepare V=1 2>&1 | tail -40; exit 2; }
       - name: Build triango_bridge.ko
         run: ./kernel/triango-bridge-lkm/build.sh "$GITHUB_WORKSPACE/kernel-common"
       - name: Build bridge (aarch64)
