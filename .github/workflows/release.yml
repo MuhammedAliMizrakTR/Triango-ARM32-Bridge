@@ -1,0 +1,68 @@
+# Build and attach release assets. Triggered when a GitHub Release is
+# published (the runner can reach artifact storage; the release then
+# carries the module zip + binaries even when created via `gh release`).
+name: Release assets
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  assets:
+    name: Build + upload release assets
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install cross toolchains
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi
+
+      - name: Restore LKM kernel build cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            kernel/.cache/linux-6.12.30
+            kernel/.cache/linux-6.12.30.tar.xz
+          key: lkm-kernel-6.12.30-${{ runner.os }}
+
+      - name: Build KernelSU/BakaSU kernel module (GKI android16-6.12)
+        run: ./kernel/build-lkm.sh
+
+      - name: Build bridge (aarch64)
+        run: make -C bridge CROSS_COMPILE=aarch64-linux-gnu- all
+
+      - name: Build gpud (aarch64)
+        run: make -C gpu CROSS_COMPILE=aarch64-linux-gnu- gpud
+
+      - name: Build NativeBridge lib + engine (aarch64)
+        run: make -C nativebridge CROSS_COMPILE=aarch64-linux-gnu- lib engine
+
+      - name: Package KernelSU module zip
+        run: |
+          TRIANGO_NB_LIB=nativebridge/build/libtriango_native_bridge.so \
+          TRIANGO_ENGINE=nativebridge/build/libtriango_nb_engine.so \
+          ./tools/package-module.sh
+
+      - name: Host tests (sanity)
+        run: |
+          make -C bridge test
+          make -C gpu test
+          make -C nativebridge test
+          make -C nativebridge engine-test
+
+      - name: Upload assets to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload "${{ github.event.release.tag_name }}" \
+            dist/triango-arm32-bridge-ksu.zip \
+            kernel/triango-bridge-lkm/triango_bridge.ko \
+            bridge/build/triango-bridge \
+            nativebridge/build/libtriango_native_bridge.so \
+            nativebridge/build/libtriango_nb_engine.so \
+            --clobber
