@@ -87,18 +87,6 @@ static void fcmp(t32_cpu *c, double a, double b)
 		c->fpscr |= 0x10000000u;
 }
 
-static double vfp_imm(uint32_t imm8)
-{
-	uint32_t b = (imm8 & 0x80u) ? 0x80000000u : 0u;
-	uint32_t e = (imm8 >> 4) & 7u;
-	uint32_t f = imm8 & 0xFu;
-	uint32_t r = b | ((e ^ 4u) << 29) | (f << 19);
-	float fv;
-
-	memcpy(&fv, &r, 4);
-	return (double)fv;
-}
-
 static int vld32(t32_cpu *c, uint32_t addr, uint32_t *out)
 {
 	uint8_t *p = t32_ptr(c->mem, addr, 4);

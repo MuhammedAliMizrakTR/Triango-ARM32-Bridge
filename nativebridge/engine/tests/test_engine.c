@@ -166,6 +166,31 @@ int main(void)
 	fn = load_blob(blob_t2_bitfield, sizeof(blob_t2_bitfield), 1);
 	CHECK("t2_bitfield", call1(fn, 0xF0, 0xAB, 0) == 0xAB);
 
+	/* ---- SSAT / USAT (thumb32 plain-binary fields) ---- */
+	fn = load_blob(blob_t_ssat_clamp, sizeof(blob_t_ssat_clamp), 1);
+	CHECK("t_ssat_clamp", call1(fn, 0, 0x1234u, 0) == 0x7Fu);
+	fn = load_blob(blob_t_ssat_neg, sizeof(blob_t_ssat_neg), 1);
+	CHECK("t_ssat_neg", call1(fn, 0, 0xFFFFFF80u, 0) == 0xFFFFFF80u);
+	CHECK("t_ssat_min", call1(fn, 0, 0x80000000u, 0) == 0xFFFFFF80u);
+	fn = load_blob(blob_t_ssat_one, sizeof(blob_t_ssat_one), 1);
+	CHECK("t_ssat_one_hi", call1(fn, 0, 5u, 0) == 0u);
+	CHECK("t_ssat_one_lo", call1(fn, 0, 0xFFFFFFFEu, 0) == 0xFFFFFFFFu);
+	fn = load_blob(blob_t_ssat_lsl, sizeof(blob_t_ssat_lsl), 1);
+	CHECK("t_ssat_lsl_clamp", call1(fn, 0, 0x40u, 0) == 0x7Fu);
+	CHECK("t_ssat_lsl_fit", call1(fn, 0, 0x3Fu, 0) == 0x7Eu);
+	fn = load_blob(blob_t_ssat_asr, sizeof(blob_t_ssat_asr), 1);
+	CHECK("t_ssat_asr_clamp", call1(fn, 0, 0x200u, 0) == 0x7Fu);
+	CHECK("t_ssat_asr_fit", call1(fn, 0, 0x22u, 0) == 0x11u);
+	fn = load_blob(blob_t_usat_clamp, sizeof(blob_t_usat_clamp), 1);
+	CHECK("t_usat_clamp", call1(fn, 0, 0x1234u, 0) == 0xFFu);
+	fn = load_blob(blob_t_usat_neg, sizeof(blob_t_usat_neg), 1);
+	CHECK("t_usat_neg", call1(fn, 0, 0xFFFFFFFBu, 0) == 0u);
+	fn = load_blob(blob_t_usat_zero, sizeof(blob_t_usat_zero), 1);
+	CHECK("t_usat_zero", call1(fn, 0, 0x1234u, 0) == 0u);
+	fn = load_blob(blob_t_usat_lsl, sizeof(blob_t_usat_lsl), 1);
+	CHECK("t_usat_lsl_clamp", call1(fn, 0, 0, 0x4000u) == 0xFFFFu);
+	CHECK("t_usat_lsl_fit", call1(fn, 0, 0, 0x3FFFu) == 0xFFFCu);
+
 	{
 		uint32_t base;
 		uint32_t *p = t32_map(&g_mem, 16, &base);
@@ -420,7 +445,8 @@ int main(void)
 	/* ---- end-to-end: real thumb32 routing of NEON/VFP ---- */
 	{
 		uint8_t *p;
-		uint32_t base, gbuf, b2;
+		uint32_t base, b2;
+		void *gbuf;
 		uint16_t *hw;
 
 		p = t32_map(&g_mem, 64, &base);

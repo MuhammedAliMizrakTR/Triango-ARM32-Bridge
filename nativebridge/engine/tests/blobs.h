@@ -77,6 +77,51 @@ static const unsigned char blob_t2_bl[] = {
 	0xc0, 0x1d, 0x70, 0x47,
 };
 
+/* t_ssat_clamp: ssat r0, #8, r1; bx lr */
+static const unsigned char blob_t_ssat_clamp[] = {
+	0x01, 0xf3, 0x07, 0x00, 0x70, 0x47,
+};
+
+/* t_ssat_neg: ssat r0, #8, r1; bx lr */
+static const unsigned char blob_t_ssat_neg[] = {
+	0x01, 0xf3, 0x07, 0x00, 0x70, 0x47,
+};
+
+/* t_ssat_one: ssat r0, #1, r1; bx lr */
+static const unsigned char blob_t_ssat_one[] = {
+	0x01, 0xf3, 0x00, 0x00, 0x70, 0x47,
+};
+
+/* t_ssat_lsl: ssat r0, #8, r1, lsl #1; bx lr */
+static const unsigned char blob_t_ssat_lsl[] = {
+	0x01, 0xf3, 0x47, 0x00, 0x70, 0x47,
+};
+
+/* t_ssat_asr: ssat r0, #8, r1, asr #1; bx lr */
+static const unsigned char blob_t_ssat_asr[] = {
+	0x21, 0xf3, 0x47, 0x00, 0x70, 0x47,
+};
+
+/* t_usat_clamp: usat r0, #8, r1; bx lr */
+static const unsigned char blob_t_usat_clamp[] = {
+	0x81, 0xf3, 0x08, 0x00, 0x70, 0x47,
+};
+
+/* t_usat_neg: usat r0, #8, r1; bx lr */
+static const unsigned char blob_t_usat_neg[] = {
+	0x81, 0xf3, 0x08, 0x00, 0x70, 0x47,
+};
+
+/* t_usat_zero: usat r0, #0, r1; bx lr */
+static const unsigned char blob_t_usat_zero[] = {
+	0x81, 0xf3, 0x00, 0x00, 0x70, 0x47,
+};
+
+/* t_usat_lsl: usat r0, #0x10, r2, lsl #2; bx lr */
+static const unsigned char blob_t_usat_lsl[] = {
+	0x82, 0xf3, 0x90, 0x00, 0x70, 0x47,
+};
+
 /* t2_muldiv: mul r0, r0, r1; udiv r0, r0, r2; bx lr */
 static const unsigned char blob_t2_muldiv[] = {
 	0x00, 0xfb, 0x01, 0xf0, 0xb0, 0xfb, 0xf2, 0xf0, 0x70, 0x47,

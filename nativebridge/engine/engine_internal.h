@@ -90,6 +90,11 @@ int t32_vfp_exec(t32_cpu *c, uint32_t pc, uint32_t insn, uint32_t *npc);
 
 /* Call guest code `fn` with up to 4 integer/pointer args.  Returns r0.
  * cpu->trap != 0 on failure.  Re-entrant: one cpu per thread. */
+#define T32_LR_SENTINEL 0xFFFFFFF0u
+
+/* execute exactly one guest insn (JIT slow path); 0 ok / -1 trap */
+int t32_fallback_step(t32_cpu *c, uint32_t pc, uint32_t *npc);
+
 uint32_t t32_call(t32_cpu *cpu, t32_space *mem, uint32_t fn,
 		  const uint32_t *args, int nargs);
 

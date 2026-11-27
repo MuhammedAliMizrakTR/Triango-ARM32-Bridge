@@ -14,9 +14,10 @@
  */
 #include "engine_internal.h"
 
+#include <stdlib.h>
 #include <string.h>
 
-#define T32_LR_SENTINEL 0xFFFFFFF0u
+/* T32_LR_SENTINEL now in engine_internal.h */
 
 static int t32_fault(t32_cpu *c, int trap, uint32_t pc, uint32_t insn)
 {
@@ -1480,11 +1481,13 @@ static int thumb32(t32_cpu *c, uint32_t pc, uint32_t h1, uint32_t *npc)
 		uint32_t rn = h1 & 0xfu;
 		uint32_t rd = (h2 >> 8) & 0xfu;
 
-		/* SSAT / USAT */
-		if ((h1 & 0xFFE0u) == 0xF300u || (h1 & 0xFFE0u) == 0xF380u) {
+		/* SSAT / USAT (h1: 11110 0 11 op sh 0 Rn; bit7 = USAT,
+		 * bit5 = sh; both are family bits, not discriminators) */
+		if ((h1 & 0xFF50u) == 0xF300u) {
 			uint32_t sat_field = h2 & 0x1Fu;
-			uint32_t sh = (h2 >> 6) & 1u;
-			uint32_t imm5 = ((h1 & 1u) << 4) | ((h2 >> 6) & 0x1Fu);
+			uint32_t sh = (h1 >> 5) & 1u;
+			uint32_t imm5 = (((h2 >> 12) & 0x7u) << 2) |
+					((h2 >> 6) & 0x3u);
 			uint32_t carry_dummy;
 			uint32_t v;
 			int32_t sv;
@@ -1592,6 +1595,37 @@ static int exec_thumb(t32_cpu *c, uint32_t pc, uint32_t *npc)
 
 static t32_space *g_call_mem_unused;
 
+/* ---- JIT glue ---- */
+
+#include "jit.h"
+
+int t32_fallback_step(t32_cpu *c, uint32_t pc, uint32_t *npc)
+{
+	if (c->cpsr & T32_CPSR_T)
+		(void)exec_thumb(c, pc, npc);
+	else
+		exec_arm(c, pc, rd32(c, pc), npc);
+	return c->trap ? -1 : 0;
+}
+
+static t32_jit *g_jit;
+static int g_jit_state;   /* 0 = lazy, 1 = on, -1 = off */
+
+static int jit_enabled(void)
+{
+	if (g_jit_state == 0) {
+		const char *e = getenv("TRIANGO_NO_JIT");
+
+		if (e && e[0] && e[0] != '0') {
+			g_jit_state = -1;
+		} else {
+			g_jit = t32_jit_create();
+			g_jit_state = g_jit ? 1 : -1;
+		}
+	}
+	return g_jit_state == 1;
+}
+
 uint32_t t32_call(t32_cpu *c, t32_space *mem, uint32_t fn,
 		  const uint32_t *args, int nargs)
 {
@@ -1652,10 +1686,17 @@ uint32_t t32_call(t32_cpu *c, t32_space *mem, uint32_t fn,
 			}
 			continue;
 		}
-		if (thumb)
+		if (thumb && jit_enabled()) {
+			int x = t32_jit_run(g_jit, c, pc, &npc);
+
+			if (x == T32_JIT_TRAP)
+				return 0;
+			/* SHIM / sentinel: loop-top checks handle npc == pc */
+		} else if (thumb) {
 			exec_thumb(c, pc, &npc);
-		else
+		} else {
 			exec_arm(c, pc, rd32(c, pc), &npc);
+		}
 		if (c->trap)
 			return 0;
 		pc = npc;
