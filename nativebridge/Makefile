@@ -14,7 +14,9 @@ CPPFLAGS += -Iinclude
 BUILD := build
 LIB_SRCS := lib/nb_triango.c lib/nb_engine.c lib/nb_elf.c
 ENGINE_SRCS := engine/mem32.c engine/shims.c engine/arm32_cpu.c \
-	       engine/arm32_elf.c engine/trampoline.c engine/triango_engine.c
+	       engine/arm32_elf.c engine/trampoline.c engine/vfp.c \
+	       engine/jit.c engine/jit_x64.c engine/jit_a64.c \
+	       engine/triango_engine.c
 
 .PHONY: all lib test engine engine-test clean
 
@@ -26,7 +28,7 @@ $(BUILD):
 $(BUILD)/libtriango_native_bridge.so: $(LIB_SRCS) | $(BUILD)
 	$(CC) $(CFLAGS) $(CPPFLAGS) -shared -fPIC -o $@ $(LIB_SRCS) -ldl
 
-lib: $(BUILD)/libtriango_native_bridge.so
+lib: $(BUILD)/libtriango_native_bridge.so $(BUILD)/libtriango_nb_engine.so
 
 $(BUILD)/libfake_engine.so: tests/fake_engine.c include/triango/nb_engine.h | $(BUILD)
 	$(CC) $(CFLAGS) $(CPPFLAGS) -shared -fPIC -o $@ tests/fake_engine.c
@@ -41,14 +43,14 @@ test: $(BUILD)/test_nb $(BUILD)/libfake_engine.so
 
 $(BUILD)/libtriango_nb_engine.so: $(ENGINE_SRCS) engine/engine_internal.h \
 		include/triango/nb_engine.h | $(BUILD)
-	$(CC) $(CFLAGS) $(CPPFLAGS) -shared -fPIC -o $@ $(ENGINE_SRCS) -lpthread
+	$(CC) $(CFLAGS) $(CPPFLAGS) -shared -fPIC -o $@ $(ENGINE_SRCS) -lpthread -lm
 
 engine: $(BUILD)/libtriango_nb_engine.so
 
 $(BUILD)/test_engine: engine/tests/test_engine.c engine/tests/blobs.h \
 		$(filter-out engine/triango_engine.c,$(ENGINE_SRCS)) | $(BUILD)
 	$(CC) $(CFLAGS) $(CPPFLAGS) -o $@ engine/tests/test_engine.c \
-		$(filter-out engine/triango_engine.c,$(ENGINE_SRCS)) -lpthread
+		$(filter-out engine/triango_engine.c,$(ENGINE_SRCS)) -lpthread -lm
 
 # cross-built arm32 guest .so for the ELF integration test (optional)
 ARM_CC := $(shell command -v arm-linux-gnueabi-gcc 2>/dev/null)
@@ -64,8 +66,10 @@ endif
 engine-test: $(BUILD)/test_engine $(BUILD)/guest_fns.so
 	@if [ -n "$(ARM_CC)" ] && [ -s $(BUILD)/guest_fns.so ]; then \
 		TRIANGO_TEST_SO=$(BUILD)/guest_fns.so ./$(BUILD)/test_engine; \
+		TRIANGO_NO_JIT=1 TRIANGO_TEST_SO=$(BUILD)/guest_fns.so ./$(BUILD)/test_engine; \
 	else \
 		./$(BUILD)/test_engine; \
+		TRIANGO_NO_JIT=1 ./$(BUILD)/test_engine; \
 	fi
 
 clean:

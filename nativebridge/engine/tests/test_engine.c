@@ -15,6 +15,7 @@
 #include <string.h>
 
 #include "blobs.h"
+#include "vfp_cases.h"
 
 static int g_pass, g_fail;
 
@@ -85,6 +86,8 @@ static void emit_movw_movt(uint8_t *dst, uint32_t rd, uint32_t v)
 
 int main(void)
 {
+	setvbuf(stdout, NULL, _IONBF, 0);
+	setvbuf(stderr, NULL, _IONBF, 0);
 	uint32_t fn, r, arr, shim, code, cb;
 	uint32_t args[4];
 	uint8_t scratch[64];
@@ -162,6 +165,31 @@ int main(void)
 
 	fn = load_blob(blob_t2_bitfield, sizeof(blob_t2_bitfield), 1);
 	CHECK("t2_bitfield", call1(fn, 0xF0, 0xAB, 0) == 0xAB);
+
+	/* ---- SSAT / USAT (thumb32 plain-binary fields) ---- */
+	fn = load_blob(blob_t_ssat_clamp, sizeof(blob_t_ssat_clamp), 1);
+	CHECK("t_ssat_clamp", call1(fn, 0, 0x1234u, 0) == 0x7Fu);
+	fn = load_blob(blob_t_ssat_neg, sizeof(blob_t_ssat_neg), 1);
+	CHECK("t_ssat_neg", call1(fn, 0, 0xFFFFFF80u, 0) == 0xFFFFFF80u);
+	CHECK("t_ssat_min", call1(fn, 0, 0x80000000u, 0) == 0xFFFFFF80u);
+	fn = load_blob(blob_t_ssat_one, sizeof(blob_t_ssat_one), 1);
+	CHECK("t_ssat_one_hi", call1(fn, 0, 5u, 0) == 0u);
+	CHECK("t_ssat_one_lo", call1(fn, 0, 0xFFFFFFFEu, 0) == 0xFFFFFFFFu);
+	fn = load_blob(blob_t_ssat_lsl, sizeof(blob_t_ssat_lsl), 1);
+	CHECK("t_ssat_lsl_clamp", call1(fn, 0, 0x40u, 0) == 0x7Fu);
+	CHECK("t_ssat_lsl_fit", call1(fn, 0, 0x3Fu, 0) == 0x7Eu);
+	fn = load_blob(blob_t_ssat_asr, sizeof(blob_t_ssat_asr), 1);
+	CHECK("t_ssat_asr_clamp", call1(fn, 0, 0x200u, 0) == 0x7Fu);
+	CHECK("t_ssat_asr_fit", call1(fn, 0, 0x22u, 0) == 0x11u);
+	fn = load_blob(blob_t_usat_clamp, sizeof(blob_t_usat_clamp), 1);
+	CHECK("t_usat_clamp", call1(fn, 0, 0x1234u, 0) == 0xFFu);
+	fn = load_blob(blob_t_usat_neg, sizeof(blob_t_usat_neg), 1);
+	CHECK("t_usat_neg", call1(fn, 0, 0xFFFFFFFBu, 0) == 0u);
+	fn = load_blob(blob_t_usat_zero, sizeof(blob_t_usat_zero), 1);
+	CHECK("t_usat_zero", call1(fn, 0, 0x1234u, 0) == 0u);
+	fn = load_blob(blob_t_usat_lsl, sizeof(blob_t_usat_lsl), 1);
+	CHECK("t_usat_lsl_clamp", call1(fn, 0, 0, 0x4000u) == 0xFFFFu);
+	CHECK("t_usat_lsl_fit", call1(fn, 0, 0, 0x3FFFu) == 0xFFFCu);
 
 	{
 		uint32_t base;
@@ -264,6 +292,196 @@ int main(void)
 
 	(void)scratch;
 	(void)cb;
+
+	/* ---------------- VFP / NEON ---------------- */
+	{
+		int i, j;
+		uint32_t npc = 0;
+
+		for (i = 0; i < T32_VFP_NCASES; i++) {
+			const t32_vfp_case *tc = &t32_vfp_cases[i];
+			char nm[96];
+			int handled;
+
+			memset(&g_cpu, 0, sizeof(g_cpu));
+			g_cpu.mem = &g_mem;
+			for (j = 0; j < 32; j++)
+				g_cpu.s[j] = tc->s_in[j];
+			for (j = 0; j < 16; j++) {
+				if (tc->d_in[j]) {
+					g_cpu.s[2 * j] = (uint32_t)tc->d_in[j];
+					g_cpu.s[2 * j + 1] =
+						(uint32_t)(tc->d_in[j] >> 32);
+				}
+			}
+			for (j = 0; j < 16; j++)
+				g_cpu.r[j] = tc->r_in[j];
+			g_cpu.fpscr = tc->fpscr_in;
+
+			handled = t32_vfp_exec(&g_cpu, 0, tc->insn, &npc);
+			snprintf(nm, sizeof(nm), "vfp[%s]", tc->asm_txt);
+			CHECK(nm, handled && !g_cpu.trap);
+			if (!handled || g_cpu.trap)
+				continue;
+			for (j = 0; j < (tc->chk_d ? 16 : 0); j++) {
+				uint64_t got =
+					((uint64_t)g_cpu.s[2 * j + 1] << 32) |
+					g_cpu.s[2 * j];
+
+				if (tc->d_exp[j] != got) {
+					printf("  %s: d%d = 0x%016llX want 0x%016llX\n",
+					       tc->asm_txt, j,
+					       (unsigned long long)got,
+					       (unsigned long long)
+						       tc->d_exp[j]);
+					g_fail++;
+					g_pass--;
+					break;
+				}
+			}
+			for (j = 0; j < (tc->chk_s ? 32 : 0); j++) {
+				if (tc->s_exp[j] != g_cpu.s[j]) {
+					printf("  %s: s%d = 0x%08X want 0x%08X\n",
+					       tc->asm_txt, j, g_cpu.s[j],
+					       tc->s_exp[j]);
+					g_fail++;
+					g_pass--;
+					break;
+				}
+			}
+			for (j = 0; j < (tc->chk_r ? 16 : 0); j++) {
+				if (tc->r_exp[j] != g_cpu.r[j]) {
+					printf("  %s: r%d = 0x%08X want 0x%08X\n",
+					       tc->asm_txt, j, g_cpu.r[j],
+					       tc->r_exp[j]);
+					g_fail++;
+					g_pass--;
+					break;
+				}
+			}
+			if (tc->fpscr_check &&
+			    tc->fpscr_exp != (g_cpu.fpscr & 0xF0000000u)) {
+				printf("  %s: fpscr = 0x%08X want 0x%08X\n",
+				       tc->asm_txt, g_cpu.fpscr,
+				       tc->fpscr_exp);
+				g_fail++;
+				g_pass--;
+			}
+		}
+
+		/* VLDR/VSTR round-trip through guest memory */
+		{
+	static const uint32_t ldr_str[] = {
+				0xED910A00u, /* vldr s0,[r1]       */
+				0xED0D1A01u, /* vstr s2,[sp,#-4]   */
+				0xED910B02u, /* vldr d0,[r1,#8]    */
+				0xED803B00u, /* vstr d3,[r0]       */
+				0xECB00B08u, /* vldmia r0!,{d0-d3} */
+				0xECA00B08u, /* vstmia r0!,{d0-d3} */
+			};
+			uint32_t gbase;
+			uint8_t *buf = t32_map(&g_mem, 256, &gbase);
+
+			CHECK("vfp-mem-map", buf != NULL);
+			if (buf) {
+				memset(&g_cpu, 0, sizeof(g_cpu));
+				g_cpu.mem = &g_mem;
+				*(uint32_t *)buf = 0xDEADBEEFu;
+				g_cpu.r[1] = gbase;
+				CHECK("vfp-vldr",
+				      t32_vfp_exec(&g_cpu, 0, ldr_str[0],
+						   &npc) &&
+					      g_cpu.s[0] == 0xDEADBEEFu);
+
+				g_cpu.s[2] = 0xCAFEBABEu;
+				g_cpu.r[13] = gbase + 16;
+				CHECK("vfp-vstr",
+				      t32_vfp_exec(&g_cpu, 0, ldr_str[1],
+						   &npc) &&
+					      *(uint32_t *)(buf + 12) ==
+						      0xCAFEBABEu);
+
+				*(uint64_t *)(buf + 8) = 0x1122334455667788ull;
+				CHECK("vfp-vldr-d",
+				      t32_vfp_exec(&g_cpu, 0, ldr_str[2],
+						   &npc) &&
+					      g_cpu.s[0] == 0x55667788u &&
+					      g_cpu.s[1] == 0x11223344u);
+
+				g_cpu.s[6] = 0x12345678u;
+				g_cpu.s[7] = 0x9ABCDEF0u;
+				g_cpu.r[0] = gbase + 32;
+				CHECK("vfp-vstr-d",
+				      t32_vfp_exec(&g_cpu, 0, ldr_str[3],
+						   &npc) &&
+					      *(uint64_t *)(buf + 32) ==
+						      0x9ABCDEF012345678ull);
+
+				{
+					int k;
+
+					for (k = 0; k < 8; k++)
+						*(uint32_t *)(buf + 64 + 4 * k) =
+							0xA0000000u + (uint32_t)k;
+					g_cpu.r[0] = gbase + 64;
+					CHECK("vfp-vldmia",
+					      t32_vfp_exec(&g_cpu, 0,
+							   ldr_str[4], &npc) &&
+					      g_cpu.s[0] == 0xA0000000u &&
+					      g_cpu.s[7] == 0xA0000007u &&
+					      g_cpu.r[0] == gbase + 64 + 32);
+					g_cpu.r[0] = gbase + 96;
+					CHECK("vfp-vstmia",
+					      t32_vfp_exec(&g_cpu, 0,
+							   ldr_str[5], &npc) &&
+					      *(uint32_t *)(buf + 96) ==
+						      0xA0000000u &&
+					      g_cpu.r[0] == gbase + 96 + 32);
+				}
+			}
+		}
+	}
+
+	/* ---- end-to-end: real thumb32 routing of NEON/VFP ---- */
+	{
+		uint8_t *p;
+		uint32_t base, b2;
+		void *gbuf;
+		uint16_t *hw;
+
+		p = t32_map(&g_mem, 64, &base);
+		emit_movw_movt(p, 1, 0);            /* r1 = gbuf, patched below */
+		emit_movw_movt(p + 8, 2, 0x3FC00000u);   /* 1.5f bits */
+		emit_movw_movt(p + 16, 3, 0x40100000u);  /* 2.25f bits */
+		hw = (uint16_t *)(void *)(p + 24);
+		/* thumb32 words as halfword pairs */
+#define TH32(w) do { *hw++ = (uint16_t)((w) >> 16); *hw++ = (uint16_t)(w); } while (0)
+		TH32(0xEE022A90u);                  /* vmov s5, r2 */
+		TH32(0xEE033A10u);                  /* vmov s6, r3 */
+		TH32(0xEE322A83u);                  /* vadd.f32 s4, s5, s6 */
+		TH32(0xFF87001Fu);                  /* vmov.i32 d0, #255 */
+		TH32(0xF921378Fu);                  /* vld1.32 {d3}, [r1] */
+		TH32(0xEF233803u);                  /* vadd.i32 d3, d3, d3 */
+#undef TH32
+		*hw++ = 0x4770u;                    /* bx lr */
+
+		gbuf = t32_map(&g_mem, 16, &b2);
+		*(uint32_t *)gbuf = 0xA1B2C3D4u;
+		emit_movw_movt(p, 1, b2);           /* r1 = gbuf */
+
+		memset(&g_cpu, 0, sizeof(g_cpu));
+		g_cpu.mem = &g_mem;
+		(void)t32_call(&g_cpu, &g_mem, base | 1u, (uint32_t[]){ 0 }, 1);
+		/* vadd.f32 s4,s5,s6 = 1.5+2.25 = 3.75 */
+		CHECK("vfp-e2e-vadd", !g_cpu.trap && g_cpu.s[4] == 0x40700000u);
+		/* vmov.i32 d0,#255 -> s0,s1 */
+		CHECK("vfp-e2e-vmov", g_cpu.s[0] == 0x000000FFu &&
+				      g_cpu.s[1] == 0x000000FFu);
+		/* vld1.32 {d3},[r1] then vadd.i32 d3,d3,d3 (wrapping) */
+		CHECK("vfp-e2e-vld1", g_cpu.s[6] == 0x436587A8u &&
+				      g_cpu.s[7] == 0u);
+	}
+
 	printf("engine-tests: %d passed, %d failed\n", g_pass, g_fail);
 	return g_fail ? 1 : 0;
 }

@@ -21,6 +21,27 @@ done
 # performs the actual soft reboot on demand.
 sh "$MODDIR/activate.sh" --no-restart
 
+# Re-assert the ABI advertisement (idempotent): covers LateLoad ordering
+# where post-fs-data ran late or a vendor service reset the props.
+if [ ! -f "$TRI/config/disable_abilist32" ]; then
+	RESETPROP=""
+	for c in resetprop /data/adb/ksu/bin/resetprop /data/adb/magisk/resetprop \
+		/system/bin/resetprop; do
+		if command -v "$c" >/dev/null 2>&1; then
+			RESETPROP="$c"
+			break
+		fi
+	done
+	if [ -n "$RESETPROP" ]; then
+		"$RESETPROP" ro.product.cpu.abilist "arm64-v8a,armeabi-v7a,armeabi" 2>/dev/null
+		"$RESETPROP" ro.product.cpu.abilist32 "armeabi-v7a,armeabi" 2>/dev/null
+		"$RESETPROP" ro.product.cpu.abilist64 "arm64-v8a" 2>/dev/null
+		"$RESETPROP" ro.vendor.product.cpu.abilist "arm64-v8a,armeabi-v7a,armeabi" 2>/dev/null
+		"$RESETPROP" ro.vendor.product.cpu.abilist32 "armeabi-v7a,armeabi" 2>/dev/null
+		echo "triango: abilist32 re-asserted" > /dev/kmsg 2>/dev/null
+	fi
+fi
+
 # Start the GPU thunk daemon if its binary was staged.
 GPUD="$TRI/triango-gpud"
 if [ -x "$GPUD" ] && [ ! -f "$TRI/config/disable_gpud" ]; then

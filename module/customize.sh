@@ -43,5 +43,28 @@ if [ ! -f "$TRI/lib/libtriango_nb_engine.so" ]; then
 	ui_print "! build it: make -C nativebridge engine (or NDK build)"
 fi
 
+# Apply the ABI advertisement NOW so arm32 APKs install straight from the
+# package installer in this very boot (no reboot needed for INSTALL).
+if [ ! -f "$TRI/config/disable_abilist32" ]; then
+	RESETPROP=""
+	for c in resetprop /data/adb/ksu/bin/resetprop /data/adb/magisk/resetprop \
+		/system/bin/resetprop; do
+		if command -v "$c" >/dev/null 2>&1; then
+			RESETPROP="$c"
+			break
+		fi
+	done
+	if [ -n "$RESETPROP" ]; then
+		"$RESETPROP" ro.product.cpu.abilist "arm64-v8a,armeabi-v7a,armeabi" 2>/dev/null
+		"$RESETPROP" ro.product.cpu.abilist32 "armeabi-v7a,armeabi" 2>/dev/null
+		"$RESETPROP" ro.product.cpu.abilist64 "arm64-v8a" 2>/dev/null
+		"$RESETPROP" ro.vendor.product.cpu.abilist "arm64-v8a,armeabi-v7a,armeabi" 2>/dev/null
+		"$RESETPROP" ro.vendor.product.cpu.abilist32 "armeabi-v7a,armeabi" 2>/dev/null
+		ui_print "- abilist32 advertised now (package installer ready)"
+	else
+		ui_print "! resetprop not found; abilist set at next boot (system.prop)"
+	fi
+fi
+
 ui_print "- done. Activate via the module WebUI (soft reboot) or"
 ui_print "  su -c /data/adb/modules/triango_arm32_bridge/activate.sh"

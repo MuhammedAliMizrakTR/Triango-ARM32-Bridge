@@ -47,7 +47,12 @@
 
 ## v0.4 — Triango JIT motoru
 
-- [ ] arm32→arm64 blok yeniden derleyici (decode → IR → AArch64 emit)
+- [x] arm32→AArch64 blok JIT (`nativebridge/engine/jit*.{c,h}`): sınıflandırıcı
+  + çevirici (x64 ve a64 backend), yorumlayıcıya güvenli düşüş (INTERP),
+  W^X blok arenası, bayrak birleştirme (N/Z/C/V ↔ CPSR 31:28) — 110/110 test
+- [x] VFP/NEON yorumlayıcı (98-kelime tablo + 56 test) JIT bloklarından
+  ortak `t32_vfp_exec` ile çalışır
+- [ ] Doğrudan blok bağlama (block linking), VFP/NEON JIT'i, reg-shift inline
 - [ ] `syscalls.c` tablosuna dayalı syscall trampolin (pointer-32, timespec32, stat64 fixup'ları)
 - [ ] `stack.c` ile misafir proses yığını/auxv/vdso32 emülasyonu
 - [ ] Self-modifying code / icache senkronizasyonu, sinyal çevirisi

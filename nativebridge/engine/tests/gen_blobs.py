@@ -100,6 +100,42 @@ FUNCS = {
         adds r0, r0, #7
         bx lr
     """),
+    "t_ssat_clamp": (THUMB, """
+        ssat r0, #8, r1
+        bx lr
+    """),
+    "t_ssat_neg": (THUMB, """
+        ssat r0, #8, r1
+        bx lr
+    """),
+    "t_ssat_one": (THUMB, """
+        ssat r0, #1, r1
+        bx lr
+    """),
+    "t_ssat_lsl": (THUMB, """
+        ssat r0, #8, r1, lsl #1
+        bx lr
+    """),
+    "t_ssat_asr": (THUMB, """
+        ssat r0, #8, r1, asr #1
+        bx lr
+    """),
+    "t_usat_clamp": (THUMB, """
+        usat r0, #8, r1
+        bx lr
+    """),
+    "t_usat_neg": (THUMB, """
+        usat r0, #8, r1
+        bx lr
+    """),
+    "t_usat_zero": (THUMB, """
+        usat r0, #0, r1
+        bx lr
+    """),
+    "t_usat_lsl": (THUMB, """
+        usat r0, #16, r2, lsl #2
+        bx lr
+    """),
     "t2_muldiv": (THUMB, [
         "mul r0, r0, r1",
         # udiv r0, r0, r2 — hand-encoded (keystone lacks the feature):
