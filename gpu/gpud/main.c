@@ -109,14 +109,37 @@ int main(int argc, char **argv)
 	fprintf(stderr, "triango-gpud: serving %u thunks on '%s' (%zu bytes)\n",
 		tg_thunk_table_len, region_name, size);
 
-	while (serve_count != 0) {
-		int n = tgpu_host_serve(&host, region, 0);
+	/* Adaptive poll: 1 ms while requests flow, exponential backoff to
+	 * 32 ms when the channel is idle (battery friendly — ~31 wakeups/s
+	 * at idle instead of 1000).  TRIANGO_GPUD_IDLE_US overrides the cap. */
+	{
+		unsigned idle = 0;
+		long idle_cap = 32000;
+		const char *cap = getenv("TRIANGO_GPUD_IDLE_US");
 
-		if (n < 0)
-			break;
-		if (serve_count > 0)
-			serve_count--;
-		usleep(1000);
+		if (cap && cap[0])
+			idle_cap = strtol(cap, NULL, 0);
+
+		while (serve_count != 0) {
+			int n = tgpu_host_serve(&host, region, 0);
+			unsigned us;
+
+			if (n < 0)
+				break;
+			if (serve_count > 0)
+				serve_count--;
+			if (n > 0) {
+				idle = 0;
+			} else if (idle < 6u) {
+				idle++;
+			}
+			us = 1000u << idle;
+			if (idle_cap >= 0 && us > (unsigned)idle_cap)
+				us = (unsigned)idle_cap;
+			if (us == 0)
+				continue;
+			usleep(us);
+		}
 	}
 	return 0;
 }
