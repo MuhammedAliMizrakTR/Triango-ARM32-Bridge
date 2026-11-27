@@ -117,6 +117,23 @@ static void test_init_gate(void)
 	CHECK(NativeBridgeItf.initialize(NULL, "/other", "armeabi"));
 }
 
+/* v1.2.1-b: NativeBridgeInitialize runs in zygote — the engine must NOT be
+ * opened (dlopen/execmem) until loadLibrary in the forked app process. */
+int triango_nb_engine_is_loaded(void);
+
+static void test_lazy_init(void)
+{
+	triango_nb_reset();
+	triango_nb_set_engine(NULL);
+	CHECK(NativeBridgeItf.initialize(NULL, "/data/local/tmp", "armeabi-v7a"));
+	CHECK_EQ(triango_nb_engine_is_loaded(), 0);
+	CHECK(NativeBridgeItf.initialize(NULL, "/other", "armeabi"));
+	CHECK_EQ(triango_nb_engine_is_loaded(), 0);
+	CHECK(NativeBridgeItf.getAppEnv("armeabi-v7a") != NULL);
+	CHECK_EQ(triango_nb_engine_is_loaded(), 0);
+	triango_nb_reset();
+}
+
 static void test_no_engine_error_path(void)
 {
 	triango_nb_reset();
@@ -216,6 +233,7 @@ int main(void)
 	test_app_env();
 	test_gating();
 	test_init_gate();
+	test_lazy_init();
 	test_no_engine_error_path();
 	test_engine_binding();
 	test_dlopen_engine();

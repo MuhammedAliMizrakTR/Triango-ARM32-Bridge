@@ -52,6 +52,12 @@ static void set_error(const char *msg)
 
 /* ---- v1 ---- */
 
+/* ZYGOTE-SAFETY CONTRACT (v1.2.1-b): this callback runs inside zygote64.
+ * It must never dlopen libtriango_nb_engine.so, never mmap/mprotect PROT_EXEC
+ * (zygote has no execmem), and never touch the JIT pool.  Everything heavy
+ * is deferred to loadLibrary()/loadLibraryExt()/getTrampoline(), which run
+ * only in app processes after fork.  test_nb asserts the engine stays
+ * unloaded after initialize(). */
 static bool nb_initialize(const NativeBridgeRuntimeCallbacks *runtime_cbs,
 			  const char *private_dir,
 			  const char *instruction_set)

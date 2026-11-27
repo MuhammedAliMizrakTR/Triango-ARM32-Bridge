@@ -67,6 +67,16 @@ const triango_nb_engine_ops *triango_nb_ensure_engine(void)
 	return g_ops;
 }
 
+/* Lazy-init contract probe (v1.2.1-b): 0 = the engine has NOT been opened
+ * yet.  NativeBridgeInitialize() runs inside zygote where dlopen'ing the
+ * engine (and any JIT/trampoline execmem it would create) is forbidden —
+ * the engine must only open from loadLibrary()/getTrampoline(), i.e. in the
+ * app process after fork.  Tests assert this stays true. */
+int triango_nb_engine_is_loaded(void)
+{
+	return g_engine_opened || g_dl != NULL;
+}
+
 void triango_nb_engine_reset(void)
 {
 	engine_close_fn close_fn;
