@@ -19,6 +19,7 @@ jobs:
       - name: NativeBridge tests
         run: make -C nativebridge test
       - name: Engine interpreter tests
+        shell: bash
         run: make -C nativebridge engine-test 2>&1 | tee engine-test.log
       - name: Upload engine test log (on failure)
         if: failure()
