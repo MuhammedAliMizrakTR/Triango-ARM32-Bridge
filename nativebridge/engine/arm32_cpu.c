@@ -658,8 +658,17 @@ static int exec_arm(t32_cpu *c, uint32_t pc, uint32_t insn, uint32_t *npc)
 	if ((insn & 0x0F000000u) == 0x0F000000u)
 		return t32_fault(c, T32_TRAP_SVC, pc, insn);
 	if ((insn & 0x0E000000u) == 0x0C000000u ||
-	    (insn & 0x0F000010u) == 0x0E000010u)
-		return t32_fault(c, T32_TRAP_UNDEF, pc, insn); /* VFP */
+	    (insn & 0x0F000010u) == 0x0E000010u) {
+		if (t32_vfp_exec(c, pc, insn, npc))
+			return 0;
+		return t32_fault(c, T32_TRAP_UNDEF, pc, insn); /* VFP gap */
+	}
+	/* NEON (unconditional 0xF2/0xF3 data-processing, 0xF4 ld/st) */
+	if ((insn & 0xFE000000u) == 0xF2000000u ||
+	    (insn & 0xFE000000u) == 0xF4000000u) {
+		if (t32_vfp_exec(c, pc, insn, npc))
+			return 0;
+	}
 	return t32_fault(c, T32_TRAP_UNDEF, pc, insn);
 }
 
@@ -1042,19 +1051,19 @@ static int thumb_dp(t32_cpu *c, uint32_t op, uint32_t rn, uint32_t rd,
 	case 0x3: r = (rn == 15) ? ~b : (a | ~b); break;
 	case 0x4: r = a ^ b; break;
 	case 0x8:
-		r = op_add(c, a, b, 0, 0, s || rd == 15);
+		r = op_add(c, a, b, 0, 0, s);
 		goto arith;
 	case 0xA:
-		r = op_add(c, a, b, 1, 1, s || rd == 15);
+		r = op_add(c, a, b, 1, 1, s);
 		goto arith;
 	case 0xB:
-		r = op_sub(c, a, b, 1, 1, s || rd == 15);
+		r = op_sub(c, a, b, 1, 1, s);
 		goto arith;
 	case 0xD:
-		r = op_sub(c, a, b, 0, 0, s || rd == 15);
+		r = op_sub(c, a, b, 0, 0, s);
 		goto arith;
 	case 0xE:
-		r = op_sub(c, b, a, 0, 0, s || rd == 15);
+		r = op_sub(c, b, a, 0, 0, s);
 		goto arith;
 	default:
 		return t32_fault(c, T32_TRAP_UNDEF, pc, (op << 8) | rd);
@@ -1078,13 +1087,13 @@ static int thumb_dp(t32_cpu *c, uint32_t op, uint32_t rn, uint32_t rd,
 
 arith:
 	if (rd == 15) {
-		branch = 1;
-		write = 0;
-	}
-	if (write)
-		c->r[rd] = r;
-	if (branch)
+		/* rd==pc && S -> CMP/CMN form: flags only, no branch.
+		 * rd==pc && !S -> add/sub pc: branch, flags unaffected. */
+		if (s)
+			return 0;
 		return do_branch(c, r & ~1u, 1, npc);
+	}
+	c->r[rd] = r;
 	return 0;
 }
 
@@ -1193,6 +1202,11 @@ static int thumb32(t32_cpu *c, uint32_t pc, uint32_t h1, uint32_t *npc)
 	 */
 	if ((h1 & 0xFE00u) == 0xF800u) {
 		int l = (h1 >> 4) & 1;
+
+		/* T32 AdvSIMD structural load/store shares this h1 space —
+		 * precise VLD1/VST1 rows in the VFP/NEON table take priority */
+		if (t32_vfp_exec(c, pc, (h1 << 16) | h2, npc) || c->trap)
+			return 0;
 		int sign = (h1 >> 8) & 1;
 		uint32_t rn = h1 & 0xfu;
 		uint32_t rt = (h2 >> 12) & 0xfu;
@@ -1380,13 +1394,30 @@ static int thumb32(t32_cpu *c, uint32_t pc, uint32_t h1, uint32_t *npc)
 		return 0;
 	}
 
+	/* UDIV / SDIV (11111 0111 011/1101 Rn | 1111 Rd 1111 Rm) */
+	if ((h1 & 0xFFF0u) == 0xFBB0u || (h1 & 0xFFF0u) == 0xFBD0u) {
+		uint32_t rn = h1 & 0xfu;
+		uint32_t rd = (h2 >> 8) & 0xfu;
+		uint32_t rm = h2 & 0xfu;
+
+		if ((h1 & 0xFFF0u) == 0xFBD0u) { /* SDIV */
+			int32_t d = (int32_t)c->r[rm];
+
+			c->r[rd] = d == 0 ? 0u :
+				   (uint32_t)((int32_t)c->r[rn] / d);
+		} else { /* UDIV */
+			c->r[rd] = c->r[rm] == 0 ? 0u : c->r[rn] / c->r[rm];
+		}
+		return 0;
+	}
+
 	/* SMULL/UMULL/SMLAL/UMLAL (11111 011 1 ...) */
-	if ((h1 & 0xFF80u) == 0xFB80u && ((h1 >> 4) & 0xFu) <= 3u) {
+	if ((h1 & 0xFF80u) == 0xFB80u && ((h1 >> 4) & 1u) == 0u) {
 		uint32_t rn = h1 & 0xfu;
 		uint32_t rdhi = (h2 >> 8) & 0xfu;
 		uint32_t rdlo = (h2 >> 12) & 0xfu;
 		uint32_t rm = h2 & 0xfu;
-		uint32_t kind = (h1 >> 4) & 3u;
+		uint32_t kind = (h1 >> 5) & 3u;
 		uint64_t p;
 
 		if (kind == 0) { /* SMULL */
@@ -1411,22 +1442,6 @@ static int thumb32(t32_cpu *c, uint32_t pc, uint32_t h1, uint32_t *npc)
 		return 0;
 	}
 
-	/* UDIV / SDIV (11111 0111 011/1101 Rn | 1111 Rd 1111 Rm) */
-	if ((h1 & 0xFFF0u) == 0xFBB0u || (h1 & 0xFFF0u) == 0xFBD0u) {
-		uint32_t rn = h1 & 0xfu;
-		uint32_t rd = (h2 >> 8) & 0xfu;
-		uint32_t rm = h2 & 0xfu;
-
-		if ((h1 & 0xFFF0u) == 0xFBD0u) { /* SDIV */
-			int32_t d = (int32_t)c->r[rm];
-
-			c->r[rd] = d == 0 ? 0u :
-				   (uint32_t)((int32_t)c->r[rn] / d);
-		} else { /* UDIV */
-			c->r[rd] = c->r[rm] == 0 ? 0u : c->r[rn] / c->r[rm];
-		}
-		return 0;
-	}
 
 	/* CLZ (1111 1010 1011 Rn | 1111 Rd 1000 Rm) */
 	if ((h1 & 0xFFF0u) == 0xFAB0u && ((h2 >> 4) & 0xfu) == 8u) {
@@ -1550,8 +1565,14 @@ static int thumb32(t32_cpu *c, uint32_t pc, uint32_t h1, uint32_t *npc)
 		return t32_fault(c, T32_TRAP_UNDEF, pc, (h1 << 16) | h2);
 	}
 
-	/* VFP/NEON (1110 1 ... / 1111 1 1 ...): documented gap */
-	return t32_fault(c, T32_TRAP_UNDEF, pc, (h1 << 16) | h2);
+	/* VFP/NEON: delegate to the coprocessor/SIMD unit */
+	{
+		uint32_t full = (h1 << 16) | h2;
+
+		if (t32_vfp_exec(c, pc, full, npc))
+			return 0;
+		return t32_fault(c, T32_TRAP_UNDEF, pc, full);
+	}
 }
 
 static int exec_thumb(t32_cpu *c, uint32_t pc, uint32_t *npc)
