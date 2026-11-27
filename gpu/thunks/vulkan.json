@@ -2,37 +2,39 @@
   "api": "vulkan",
   "base": 12288,
   "functions": [
-    { "name": "vkGetInstanceProcAddr", "ret": "handle",
-      "args": [
+    { "name": "vkGetInstanceProcAddr", "ret": "handle", "args": [
         { "name": "instance", "type": "handle" },
         { "name": "pName", "type": "string" } ] },
-    { "name": "vkGetDeviceProcAddr", "ret": "handle",
-      "args": [
+    { "name": "vkGetDeviceProcAddr", "ret": "handle", "args": [
         { "name": "device", "type": "handle" },
         { "name": "pName", "type": "string" } ] },
-    { "name": "vkDestroyInstance", "ret": "void",
-      "args": [
+    { "name": "vkEnumerateInstanceVersion", "ret": "int32", "args": [
+        { "name": "pApiVersion", "type": "buf_out", "len_fixed": 4 } ] },
+    { "name": "vkCreateInstance", "ret": "int32", "struct_conv": true, "args": [
+        { "name": "pCreateInfo", "type": "buf_in", "len_fixed": 128 },
+        { "name": "pAllocator", "type": "handle" },
+        { "name": "pInstance", "type": "handle_out", "len_fixed": 8 } ] },
+    { "name": "vkDestroyInstance", "ret": "void", "args": [
         { "name": "instance", "type": "handle" },
         { "name": "pAllocator", "type": "handle" } ] },
-    { "name": "vkDestroyDevice", "ret": "void",
-      "args": [
-        { "name": "device", "type": "handle" },
-        { "name": "pAllocator", "type": "handle" } ] },
-    { "name": "vkEnumerateInstanceVersion", "ret": "int32",
-      "args": [ { "name": "pApiVersion", "type": "buf_out", "len_fixed": 4 } ] },
-    { "name": "vkEnumeratePhysicalDevices", "ret": "int32",
-      "args": [
+    { "name": "vkEnumeratePhysicalDevices", "ret": "int32", "args": [
         { "name": "instance", "type": "handle" },
         { "name": "pPhysicalDeviceCount", "type": "buf_out", "len_fixed": 4 },
         { "name": "pPhysicalDevices", "type": "handle_array_out", "count_fixed": 32, "count_from": "pPhysicalDeviceCount" } ] },
-    { "name": "vkCreateInstance", "ret": "int32", "struct_conv": true,
-      "args": [
-        { "name": "pCreateInfo", "type": "buf_in", "len_fixed": 128 },
-        { "name": "pAllocator", "type": "handle" },
-        { "name": "pInstance", "type": "handle_out" } ] },
-    { "name": "vkGetPhysicalDeviceProperties", "ret": "void", "struct_conv": true,
-      "args": [
+    { "name": "vkGetPhysicalDeviceProperties", "ret": "void", "struct_conv": true, "args": [
         { "name": "physicalDevice", "type": "handle" },
-        { "name": "pProperties", "type": "buf_out", "len_fixed": 512 } ] }
+        { "name": "pProperties", "type": "buf_out", "len_fixed": 512 } ] },
+    { "name": "vkGetDeviceQueue", "ret": "void", "args": [
+        { "name": "device", "type": "handle" },
+        { "name": "queueFamilyIndex", "type": "uint32" },
+        { "name": "queueIndex", "type": "uint32" },
+        { "name": "pQueue", "type": "handle_out", "len_fixed": 8 } ] },
+    { "name": "vkDestroyDevice", "ret": "void", "args": [
+        { "name": "device", "type": "handle" },
+        { "name": "pAllocator", "type": "handle" } ] },
+    { "name": "vkDeviceWaitIdle", "ret": "int32", "args": [
+        { "name": "device", "type": "handle" } ] },
+    { "name": "vkQueueWaitIdle", "ret": "int32", "args": [
+        { "name": "queue", "type": "handle" } ] }
   ]
 }

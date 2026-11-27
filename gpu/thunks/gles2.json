@@ -2,69 +2,1135 @@
   "api": "gles2",
   "base": 8192,
   "functions": [
-    { "name": "glGetError", "ret": "uint32", "args": [] },
-    { "name": "glGetString", "ret": "string",
-      "args": [ { "name": "name", "type": "uint32" } ] },
-    { "name": "glClearColor", "ret": "void",
+    {
+      "name": "glGetError",
+      "ret": "uint32",
+      "args": []
+    },
+    {
+      "name": "glGetString",
+      "ret": "string",
       "args": [
-        { "name": "red", "type": "float" },
-        { "name": "green", "type": "float" },
-        { "name": "blue", "type": "float" },
-        { "name": "alpha", "type": "float" } ] },
-    { "name": "glClear", "ret": "void",
-      "args": [ { "name": "mask", "type": "uint32" } ] },
-    { "name": "glViewport", "ret": "void",
+        {
+          "name": "name",
+          "type": "uint32"
+        }
+      ]
+    },
+    {
+      "name": "glClearColor",
+      "ret": "void",
       "args": [
-        { "name": "x", "type": "int32" },
-        { "name": "y", "type": "int32" },
-        { "name": "width", "type": "int32" },
-        { "name": "height", "type": "int32" } ] },
-    { "name": "glEnable", "ret": "void",
-      "args": [ { "name": "cap", "type": "uint32" } ] },
-    { "name": "glDisable", "ret": "void",
-      "args": [ { "name": "cap", "type": "uint32" } ] },
-    { "name": "glDrawArrays", "ret": "void",
+        {
+          "name": "r",
+          "type": "float"
+        },
+        {
+          "name": "g",
+          "type": "float"
+        },
+        {
+          "name": "b",
+          "type": "float"
+        },
+        {
+          "name": "a",
+          "type": "float"
+        }
+      ]
+    },
+    {
+      "name": "glClear",
+      "ret": "void",
       "args": [
-        { "name": "mode", "type": "uint32" },
-        { "name": "first", "type": "int32" },
-        { "name": "count", "type": "int32" } ] },
-    { "name": "glFinish", "ret": "void", "args": [] },
-    { "name": "glFlush", "ret": "void", "args": [] },
-    { "name": "glGenBuffers", "ret": "void",
+        {
+          "name": "mask",
+          "type": "uint32"
+        }
+      ]
+    },
+    {
+      "name": "glClearDepthf",
+      "ret": "void",
       "args": [
-        { "name": "n", "type": "int32" },
-        { "name": "buffers", "type": "buf_out", "len_arg": "n", "len_scale": 4 } ] },
-    { "name": "glDeleteBuffers", "ret": "void",
+        {
+          "name": "depth",
+          "type": "float"
+        }
+      ]
+    },
+    {
+      "name": "glViewport",
+      "ret": "void",
       "args": [
-        { "name": "n", "type": "int32" },
-        { "name": "buffers", "type": "buf_in", "len_arg": "n", "len_scale": 4 } ] },
-    { "name": "glBindBuffer", "ret": "void",
+        {
+          "name": "x",
+          "type": "int32"
+        },
+        {
+          "name": "y",
+          "type": "int32"
+        },
+        {
+          "name": "width",
+          "type": "int32"
+        },
+        {
+          "name": "height",
+          "type": "int32"
+        }
+      ]
+    },
+    {
+      "name": "glScissor",
+      "ret": "void",
       "args": [
-        { "name": "target", "type": "uint32" },
-        { "name": "buffer", "type": "uint32" } ] },
-    { "name": "glBufferData", "ret": "void",
+        {
+          "name": "x",
+          "type": "int32"
+        },
+        {
+          "name": "y",
+          "type": "int32"
+        },
+        {
+          "name": "width",
+          "type": "int32"
+        },
+        {
+          "name": "height",
+          "type": "int32"
+        }
+      ]
+    },
+    {
+      "name": "glEnable",
+      "ret": "void",
       "args": [
-        { "name": "target", "type": "uint32" },
-        { "name": "size", "type": "int64" },
-        { "name": "data", "type": "buf_in", "len_arg": "size" },
-        { "name": "usage", "type": "uint32" } ] },
-    { "name": "glCreateShader", "ret": "uint32",
-      "args": [ { "name": "type", "type": "uint32" } ] },
-    { "name": "glCompileShader", "ret": "void",
-      "args": [ { "name": "shader", "type": "uint32" } ] },
-    { "name": "glCreateProgram", "ret": "uint32", "args": [] },
-    { "name": "glAttachShader", "ret": "void",
+        {
+          "name": "cap",
+          "type": "uint32"
+        }
+      ]
+    },
+    {
+      "name": "glDisable",
+      "ret": "void",
       "args": [
-        { "name": "program", "type": "uint32" },
-        { "name": "shader", "type": "uint32" } ] },
-    { "name": "glLinkProgram", "ret": "void",
-      "args": [ { "name": "program", "type": "uint32" } ] },
-    { "name": "glUseProgram", "ret": "void",
-      "args": [ { "name": "program", "type": "uint32" } ] },
-    { "name": "glGetProgramiv", "ret": "void",
+        {
+          "name": "cap",
+          "type": "uint32"
+        }
+      ]
+    },
+    {
+      "name": "glIsEnabled",
+      "ret": "uint32",
       "args": [
-        { "name": "program", "type": "uint32" },
-        { "name": "pname", "type": "uint32" },
-        { "name": "params", "type": "buf_out", "len_fixed": 4 } ] }
+        {
+          "name": "cap",
+          "type": "uint32"
+        }
+      ]
+    },
+    {
+      "name": "glBlendFunc",
+      "ret": "void",
+      "args": [
+        {
+          "name": "sfactor",
+          "type": "uint32"
+        },
+        {
+          "name": "dfactor",
+          "type": "uint32"
+        }
+      ]
+    },
+    {
+      "name": "glBlendFuncSeparate",
+      "ret": "void",
+      "args": [
+        {
+          "name": "srcRGB",
+          "type": "uint32"
+        },
+        {
+          "name": "dstRGB",
+          "type": "uint32"
+        },
+        {
+          "name": "srcAlpha",
+          "type": "uint32"
+        },
+        {
+          "name": "dstAlpha",
+          "type": "uint32"
+        }
+      ]
+    },
+    {
+      "name": "glDepthFunc",
+      "ret": "void",
+      "args": [
+        {
+          "name": "func",
+          "type": "uint32"
+        }
+      ]
+    },
+    {
+      "name": "glDepthMask",
+      "ret": "void",
+      "args": [
+        {
+          "name": "flag",
+          "type": "int32"
+        }
+      ]
+    },
+    {
+      "name": "glDepthRangef",
+      "ret": "void",
+      "args": [
+        {
+          "name": "n",
+          "type": "float"
+        },
+        {
+          "name": "f",
+          "type": "float"
+        }
+      ]
+    },
+    {
+      "name": "glCullFace",
+      "ret": "void",
+      "args": [
+        {
+          "name": "mode",
+          "type": "uint32"
+        }
+      ]
+    },
+    {
+      "name": "glFrontFace",
+      "ret": "void",
+      "args": [
+        {
+          "name": "mode",
+          "type": "uint32"
+        }
+      ]
+    },
+    {
+      "name": "glPolygonOffset",
+      "ret": "void",
+      "args": [
+        {
+          "name": "factor",
+          "type": "float"
+        },
+        {
+          "name": "units",
+          "type": "float"
+        }
+      ]
+    },
+    {
+      "name": "glLineWidth",
+      "ret": "void",
+      "args": [
+        {
+          "name": "width",
+          "type": "float"
+        }
+      ]
+    },
+    {
+      "name": "glPixelStorei",
+      "ret": "void",
+      "args": [
+        {
+          "name": "pname",
+          "type": "uint32"
+        },
+        {
+          "name": "param",
+          "type": "int32"
+        }
+      ]
+    },
+    {
+      "name": "glHint",
+      "ret": "void",
+      "args": [
+        {
+          "name": "target",
+          "type": "uint32"
+        },
+        {
+          "name": "mode",
+          "type": "uint32"
+        }
+      ]
+    },
+    {
+      "name": "glDrawArrays",
+      "ret": "void",
+      "args": [
+        {
+          "name": "mode",
+          "type": "uint32"
+        },
+        {
+          "name": "first",
+          "type": "int32"
+        },
+        {
+          "name": "count",
+          "type": "int32"
+        }
+      ]
+    },
+    {
+      "name": "glDrawElements",
+      "ret": "void",
+      "args": [
+        {
+          "name": "mode",
+          "type": "uint32"
+        },
+        {
+          "name": "count",
+          "type": "int32"
+        },
+        {
+          "name": "type",
+          "type": "uint32"
+        },
+        {
+          "name": "indices",
+          "type": "buf_in",
+          "len_arg": "count",
+          "len_scale": 4
+        }
+      ]
+    },
+    {
+      "name": "glFinish",
+      "ret": "void",
+      "args": []
+    },
+    {
+      "name": "glFlush",
+      "ret": "void",
+      "args": []
+    },
+    {
+      "name": "glGenTextures",
+      "ret": "void",
+      "args": [
+        {
+          "name": "n",
+          "type": "int32"
+        },
+        {
+          "name": "textures",
+          "type": "handle_array_out",
+          "count_fixed": 64,
+          "count_from": "n",
+          "elem": "u32"
+        }
+      ]
+    },
+    {
+      "name": "glDeleteTextures",
+      "ret": "void",
+      "args": [
+        {
+          "name": "n",
+          "type": "int32"
+        },
+        {
+          "name": "textures",
+          "type": "buf_in",
+          "len_arg": "n",
+          "len_scale": 4
+        }
+      ]
+    },
+    {
+      "name": "glBindTexture",
+      "ret": "void",
+      "args": [
+        {
+          "name": "target",
+          "type": "uint32"
+        },
+        {
+          "name": "texture",
+          "type": "uint32"
+        }
+      ]
+    },
+    {
+      "name": "glIsTexture",
+      "ret": "uint32",
+      "args": [
+        {
+          "name": "texture",
+          "type": "uint32"
+        }
+      ]
+    },
+    {
+      "name": "glActiveTexture",
+      "ret": "void",
+      "args": [
+        {
+          "name": "texture",
+          "type": "uint32"
+        }
+      ]
+    },
+    {
+      "name": "glTexImage2D",
+      "ret": "void",
+      "args": [
+        {
+          "name": "target",
+          "type": "uint32"
+        },
+        {
+          "name": "level",
+          "type": "int32"
+        },
+        {
+          "name": "internalformat",
+          "type": "int32"
+        },
+        {
+          "name": "width",
+          "type": "int32"
+        },
+        {
+          "name": "height",
+          "type": "int32"
+        },
+        {
+          "name": "border",
+          "type": "int32"
+        },
+        {
+          "name": "format",
+          "type": "uint32"
+        },
+        {
+          "name": "type",
+          "type": "uint32"
+        },
+        {
+          "name": "pixels",
+          "type": "buf_in",
+          "len_expr": "(width > 0 && height > 0) ? (uint32_t)width * (uint32_t)height * 4u : 0u"
+        }
+      ]
+    },
+    {
+      "name": "glTexSubImage2D",
+      "ret": "void",
+      "args": [
+        {
+          "name": "target",
+          "type": "uint32"
+        },
+        {
+          "name": "level",
+          "type": "int32"
+        },
+        {
+          "name": "xoffset",
+          "type": "int32"
+        },
+        {
+          "name": "yoffset",
+          "type": "int32"
+        },
+        {
+          "name": "width",
+          "type": "int32"
+        },
+        {
+          "name": "height",
+          "type": "int32"
+        },
+        {
+          "name": "format",
+          "type": "uint32"
+        },
+        {
+          "name": "type",
+          "type": "uint32"
+        },
+        {
+          "name": "pixels",
+          "type": "buf_in",
+          "len_expr": "(width > 0 && height > 0) ? (uint32_t)width * (uint32_t)height * 4u : 0u"
+        }
+      ]
+    },
+    {
+      "name": "glReadPixels",
+      "ret": "void",
+      "args": [
+        {
+          "name": "x",
+          "type": "int32"
+        },
+        {
+          "name": "y",
+          "type": "int32"
+        },
+        {
+          "name": "width",
+          "type": "int32"
+        },
+        {
+          "name": "height",
+          "type": "int32"
+        },
+        {
+          "name": "format",
+          "type": "uint32"
+        },
+        {
+          "name": "type",
+          "type": "uint32"
+        },
+        {
+          "name": "pixels",
+          "type": "buf_out",
+          "len_expr": "(width > 0 && height > 0) ? (uint32_t)width * (uint32_t)height * 4u : 0u"
+        }
+      ]
+    },
+    {
+      "name": "glGenBuffers",
+      "ret": "void",
+      "args": [
+        {
+          "name": "n",
+          "type": "int32"
+        },
+        {
+          "name": "buffers",
+          "type": "handle_array_out",
+          "count_fixed": 64,
+          "count_from": "n",
+          "elem": "u32"
+        }
+      ]
+    },
+    {
+      "name": "glDeleteBuffers",
+      "ret": "void",
+      "args": [
+        {
+          "name": "n",
+          "type": "int32"
+        },
+        {
+          "name": "buffers",
+          "type": "buf_in",
+          "len_arg": "n",
+          "len_scale": 4
+        }
+      ]
+    },
+    {
+      "name": "glBindBuffer",
+      "ret": "void",
+      "args": [
+        {
+          "name": "target",
+          "type": "uint32"
+        },
+        {
+          "name": "buffer",
+          "type": "uint32"
+        }
+      ]
+    },
+    {
+      "name": "glIsBuffer",
+      "ret": "uint32",
+      "args": [
+        {
+          "name": "buffer",
+          "type": "uint32"
+        }
+      ]
+    },
+    {
+      "name": "glBufferData",
+      "ret": "void",
+      "args": [
+        {
+          "name": "target",
+          "type": "uint32"
+        },
+        {
+          "name": "size",
+          "type": "int64"
+        },
+        {
+          "name": "data",
+          "type": "buf_in",
+          "len_arg": "size"
+        },
+        {
+          "name": "usage",
+          "type": "uint32"
+        }
+      ]
+    },
+    {
+      "name": "glGenFramebuffers",
+      "ret": "void",
+      "args": [
+        {
+          "name": "n",
+          "type": "int32"
+        },
+        {
+          "name": "framebuffers",
+          "type": "handle_array_out",
+          "count_fixed": 64,
+          "count_from": "n",
+          "elem": "u32"
+        }
+      ]
+    },
+    {
+      "name": "glDeleteFramebuffers",
+      "ret": "void",
+      "args": [
+        {
+          "name": "n",
+          "type": "int32"
+        },
+        {
+          "name": "framebuffers",
+          "type": "buf_in",
+          "len_arg": "n",
+          "len_scale": 4
+        }
+      ]
+    },
+    {
+      "name": "glGenRenderbuffers",
+      "ret": "void",
+      "args": [
+        {
+          "name": "n",
+          "type": "int32"
+        },
+        {
+          "name": "renderbuffers",
+          "type": "handle_array_out",
+          "count_fixed": 64,
+          "count_from": "n",
+          "elem": "u32"
+        }
+      ]
+    },
+    {
+      "name": "glDeleteRenderbuffers",
+      "ret": "void",
+      "args": [
+        {
+          "name": "n",
+          "type": "int32"
+        },
+        {
+          "name": "renderbuffers",
+          "type": "buf_in",
+          "len_arg": "n",
+          "len_scale": 4
+        }
+      ]
+    },
+    {
+      "name": "glCreateShader",
+      "ret": "uint32",
+      "args": [
+        {
+          "name": "type",
+          "type": "uint32"
+        }
+      ]
+    },
+    {
+      "name": "glDeleteShader",
+      "ret": "void",
+      "args": [
+        {
+          "name": "shader",
+          "type": "uint32"
+        }
+      ]
+    },
+    {
+      "name": "glIsShader",
+      "ret": "uint32",
+      "args": [
+        {
+          "name": "shader",
+          "type": "uint32"
+        }
+      ]
+    },
+    {
+      "name": "glShaderSource",
+      "ret": "void",
+      "args": [
+        {
+          "name": "shader",
+          "type": "uint32"
+        },
+        {
+          "name": "count",
+          "type": "int32"
+        },
+        {
+          "name": "string",
+          "type": "string_array",
+          "count_arg": "count",
+          "len_arg": "length"
+        },
+        {
+          "name": "length",
+          "type": "buf_in",
+          "len_arg": "count",
+          "len_scale": 4
+        }
+      ]
+    },
+    {
+      "name": "glCompileShader",
+      "ret": "void",
+      "args": [
+        {
+          "name": "shader",
+          "type": "uint32"
+        }
+      ]
+    },
+    {
+      "name": "glGetShaderiv",
+      "ret": "void",
+      "args": [
+        {
+          "name": "shader",
+          "type": "uint32"
+        },
+        {
+          "name": "pname",
+          "type": "uint32"
+        },
+        {
+          "name": "params",
+          "type": "buf_out",
+          "len_fixed": 4
+        }
+      ]
+    },
+    {
+      "name": "glGetShaderInfoLog",
+      "ret": "void",
+      "args": [
+        {
+          "name": "shader",
+          "type": "uint32"
+        },
+        {
+          "name": "bufSize",
+          "type": "int32"
+        },
+        {
+          "name": "length",
+          "type": "buf_out",
+          "len_fixed": 4
+        },
+        {
+          "name": "infoLog",
+          "type": "buf_out",
+          "len_arg": "bufSize"
+        }
+      ]
+    },
+    {
+      "name": "glCreateProgram",
+      "ret": "uint32",
+      "args": []
+    },
+    {
+      "name": "glDeleteProgram",
+      "ret": "void",
+      "args": [
+        {
+          "name": "program",
+          "type": "uint32"
+        }
+      ]
+    },
+    {
+      "name": "glIsProgram",
+      "ret": "uint32",
+      "args": [
+        {
+          "name": "program",
+          "type": "uint32"
+        }
+      ]
+    },
+    {
+      "name": "glAttachShader",
+      "ret": "void",
+      "args": [
+        {
+          "name": "program",
+          "type": "uint32"
+        },
+        {
+          "name": "shader",
+          "type": "uint32"
+        }
+      ]
+    },
+    {
+      "name": "glLinkProgram",
+      "ret": "void",
+      "args": [
+        {
+          "name": "program",
+          "type": "uint32"
+        }
+      ]
+    },
+    {
+      "name": "glUseProgram",
+      "ret": "void",
+      "args": [
+        {
+          "name": "program",
+          "type": "uint32"
+        }
+      ]
+    },
+    {
+      "name": "glGetProgramiv",
+      "ret": "void",
+      "args": [
+        {
+          "name": "program",
+          "type": "uint32"
+        },
+        {
+          "name": "pname",
+          "type": "uint32"
+        },
+        {
+          "name": "params",
+          "type": "buf_out",
+          "len_fixed": 4
+        }
+      ]
+    },
+    {
+      "name": "glGetProgramInfoLog",
+      "ret": "void",
+      "args": [
+        {
+          "name": "program",
+          "type": "uint32"
+        },
+        {
+          "name": "bufSize",
+          "type": "int32"
+        },
+        {
+          "name": "length",
+          "type": "buf_out",
+          "len_fixed": 4
+        },
+        {
+          "name": "infoLog",
+          "type": "buf_out",
+          "len_arg": "bufSize"
+        }
+      ]
+    },
+    {
+      "name": "glGetAttribLocation",
+      "ret": "int32",
+      "args": [
+        {
+          "name": "program",
+          "type": "uint32"
+        },
+        {
+          "name": "name",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "glBindAttribLocation",
+      "ret": "void",
+      "args": [
+        {
+          "name": "program",
+          "type": "uint32"
+        },
+        {
+          "name": "index",
+          "type": "uint32"
+        },
+        {
+          "name": "name",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "glGetUniformLocation",
+      "ret": "int32",
+      "args": [
+        {
+          "name": "program",
+          "type": "uint32"
+        },
+        {
+          "name": "name",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "glUniform1f",
+      "ret": "void",
+      "args": [
+        {
+          "name": "location",
+          "type": "int32"
+        },
+        {
+          "name": "x",
+          "type": "float"
+        }
+      ]
+    },
+    {
+      "name": "glUniform2f",
+      "ret": "void",
+      "args": [
+        {
+          "name": "location",
+          "type": "int32"
+        },
+        {
+          "name": "x",
+          "type": "float"
+        },
+        {
+          "name": "y",
+          "type": "float"
+        }
+      ]
+    },
+    {
+      "name": "glUniform3f",
+      "ret": "void",
+      "args": [
+        {
+          "name": "location",
+          "type": "int32"
+        },
+        {
+          "name": "x",
+          "type": "float"
+        },
+        {
+          "name": "y",
+          "type": "float"
+        },
+        {
+          "name": "z",
+          "type": "float"
+        }
+      ]
+    },
+    {
+      "name": "glUniform4f",
+      "ret": "void",
+      "args": [
+        {
+          "name": "location",
+          "type": "int32"
+        },
+        {
+          "name": "x",
+          "type": "float"
+        },
+        {
+          "name": "y",
+          "type": "float"
+        },
+        {
+          "name": "z",
+          "type": "float"
+        },
+        {
+          "name": "w",
+          "type": "float"
+        }
+      ]
+    },
+    {
+      "name": "glUniform1i",
+      "ret": "void",
+      "args": [
+        {
+          "name": "location",
+          "type": "int32"
+        },
+        {
+          "name": "x",
+          "type": "int32"
+        }
+      ]
+    },
+    {
+      "name": "glUniform2i",
+      "ret": "void",
+      "args": [
+        {
+          "name": "location",
+          "type": "int32"
+        },
+        {
+          "name": "x",
+          "type": "int32"
+        },
+        {
+          "name": "y",
+          "type": "int32"
+        }
+      ]
+    },
+    {
+      "name": "glUniform3i",
+      "ret": "void",
+      "args": [
+        {
+          "name": "location",
+          "type": "int32"
+        },
+        {
+          "name": "x",
+          "type": "int32"
+        },
+        {
+          "name": "y",
+          "type": "int32"
+        },
+        {
+          "name": "z",
+          "type": "int32"
+        }
+      ]
+    },
+    {
+      "name": "glUniform4i",
+      "ret": "void",
+      "args": [
+        {
+          "name": "location",
+          "type": "int32"
+        },
+        {
+          "name": "x",
+          "type": "int32"
+        },
+        {
+          "name": "y",
+          "type": "int32"
+        },
+        {
+          "name": "z",
+          "type": "int32"
+        },
+        {
+          "name": "w",
+          "type": "int32"
+        }
+      ]
+    },
+    {
+      "name": "glUniformMatrix4fv",
+      "ret": "void",
+      "args": [
+        {
+          "name": "location",
+          "type": "int32"
+        },
+        {
+          "name": "count",
+          "type": "int32"
+        },
+        {
+          "name": "transpose",
+          "type": "int32"
+        },
+        {
+          "name": "value",
+          "type": "buf_in",
+          "len_arg": "count",
+          "len_scale": 64
+        }
+      ]
+    },
+    {
+      "name": "glGetFloatv",
+      "ret": "void",
+      "args": [
+        {
+          "name": "pname",
+          "type": "uint32"
+        },
+        {
+          "name": "data",
+          "type": "buf_out",
+          "len_fixed": 16
+        }
+      ]
+    },
+    {
+      "name": "glGetIntegerv",
+      "ret": "void",
+      "args": [
+        {
+          "name": "pname",
+          "type": "uint32"
+        },
+        {
+          "name": "data",
+          "type": "buf_out",
+          "len_fixed": 16
+        }
+      ]
+    }
   ]
 }

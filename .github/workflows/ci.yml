@@ -14,6 +14,8 @@ jobs:
         run: make -C bridge test
       - name: GPU thunk tests
         run: make -C gpu test
+      - name: NativeBridge tests
+        run: make -C nativebridge test
       - name: Build bridge binary
         run: make -C bridge all
       - name: Selftest
@@ -75,6 +77,8 @@ jobs:
           fi
       - name: Build bridge (aarch64)
         run: make -C bridge CROSS_COMPILE=aarch64-linux-gnu- all
+      - name: Build gpud (aarch64)
+        run: make -C gpu CROSS_COMPILE=aarch64-linux-gnu- gpud
       - name: Package KernelSU module zip
         run: ./tools/package-module.sh
       - name: Upload artifacts

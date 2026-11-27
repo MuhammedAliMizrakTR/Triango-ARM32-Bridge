@@ -1,17 +1,19 @@
-# Triango ARM32 Bridge — system properties.
+# Triango ARM32 Bridge — system properties (v1.0)
 #
-# ABI reklamı (v0.2): INSTALL_FAILED_NO_MATCHING_ABIS sorununu çözer —
-# PackageManager'ın arm32 APK'ları kurmasına izin verir. Ayrıntılar ve
-# güvenlik notları: docs/abi-fix.md.
+# 1) ABI reklamı: INSTALL_FAILED_NO_MATCHING_ABIS çözümü (docs/abi-fix.md).
+#    Kapatma: /data/adb/triango/config/disable_abilist32
+# 2) NativeBridge: ART, arm32 yerel kütüphanelerini Triango çeviri motoru
+#    üzerinden yükler (docs/nativebridge.md).  İki yol:
+#      a) systemless (tam yeniden başlatma sonrası mount): modül system/lib64
+#      b) soft-reboot yolu: activate.sh /data/adb/triango/lib + linkerconfig
+#    Değer mutlak yol olursa (b) yolu kullanılır; activate.sh ayarlar.
+#    Kapatma: /data/adb/triango/config/disable_nativebridge
 #
-# Kaldırmak için: /data/adb/triango/config/disable_abilist32 dosyasını
-# oluşturun (post-fs-data.sh resetprop adımını atlar) ve bu satırları
-# yorumlayıp modülü yeniden kurun.
-#
-# NOT: Uygulama düzeyi çalıştırma (zygote32/ART + NativeBridge) roadmap
-# v0.3'tedir; bu prop'lar yalnızca kurulum/akış katmanını açar.
+# NOT: Kod çalıştırma zinciri tamamlanana kadar uygulama düzeyi arm32
+# çalıştırma deneyseldir (roadmap v0.3/v0.4). Kurulum/akış açıktır.
 ro.product.cpu.abilist=arm64-v8a,armeabi-v7a,armeabi
 ro.product.cpu.abilist32=armeabi-v7a,armeabi
 ro.product.cpu.abilist64=arm64-v8a
 ro.vendor.product.cpu.abilist=arm64-v8a,armeabi-v7a,armeabi
 ro.vendor.product.cpu.abilist32=armeabi-v7a,armeabi
+ro.dalvik.vm.native.bridge=libtriango_native_bridge.so

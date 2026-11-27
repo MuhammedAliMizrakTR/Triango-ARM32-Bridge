@@ -18,8 +18,15 @@
 - [x] **`INSTALL_FAILED_NO_MATCHING_ABIS` çözümü**: `abilist32` prop'ları
   (post-fs-data `resetprop` + `system.prop`) + `tools/pm-install-arm32.sh`
   — `docs/abi-fix.md`
-- [ ] GPU turu 2: `glShaderSource`/`glReadPixels`/`eglChooseConfig` thunk'ları,
-  gpud handle jeton-eşleme tablosu, ANativeWindow/gralloc köprüsü
+- [x] **GPU turu 2**: `glShaderSource` (string dizisi), `glReadPixels`,
+  `eglChooseConfig` + ~100 thunk girişi; **jeton-eşleme tablosu**
+  (32-bit misafir ↔ 64-bit driver handle) — `make -C gpu test` 4098 kontrol
+- [x] **NativeBridge KSU modülü v1.0**: `libtriango_native_bridge.so`
+  (arayüz v6, ELF kapısı, motor eklentisi ABI), LateLoad uyumlu,
+  soft-reboot aktivasyon (linkerconfig + resetprop + zygote restart),
+  **WebUI** — `docs/nativebridge.md`
+- [ ] GPU turu 3: ANativeWindow/gralloc köprüsü, struct_conv üreteci
+  (pNext zinciri), `eglGetProcAddress` shim eşleme
 - [ ] `tools/build-qemu-engine.sh` ile statik qemu-arm üretimi (CI artefaktı)
 - [ ] sysroot32 paketleyici (armeabi-v7a bionic + linker çıkarımı/otomatik paketleme)
 - [ ] Bellek/performans: qemu `plugin`/TB cache ayarları, çoklu çekirdek
@@ -27,8 +34,11 @@
 
 ## v0.3 — Uygulama düzeyi (Houdini benzeri)
 
+- [x] **NativeBridge arayüzü + modül** (`ro.dalvik.vm.native.bridge=libtriango_native_bridge.so`,
+  WebUI, soft reboot) — `docs/nativebridge.md`
+- [ ] **Motor eklentisi**: `libtriango_nb_engine.so` (qemu-user köprüsü →
+  Triango JIT) — `nb_engine.h` ABI'si hazır
 - [ ] zygote32 / `app_process32` yolu: arm32 ART + 32-bit framework kütüphaneleri
-- [ ] ART "isa çevirici" köprüsü (`ro.dalvik.vm.native.bridge=libtriango_native_bridge.so`)
 - [ ] Binder/servis köprüsü: arm32 uygulama ↔ 64-bit system_server
 - [ ] SurfaceFlinger/GPU: EGL/Vulkan **dişli** tamamlama (struct_conv üreteci,
   pNext zinciri; `docs/gpu-thunking.md` §4-5) — arm32 vendor lib'leri gerekmez
