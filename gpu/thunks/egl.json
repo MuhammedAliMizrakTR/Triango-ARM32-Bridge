@@ -1,0 +1,52 @@
+{
+  "api": "egl",
+  "base": 4096,
+  "functions": [
+    { "name": "eglGetDisplay", "ret": "handle",
+      "args": [ { "name": "display_id", "type": "handle" } ] },
+    { "name": "eglInitialize", "ret": "int32",
+      "args": [
+        { "name": "dpy", "type": "handle" },
+        { "name": "major", "type": "buf_out", "len_fixed": 4 },
+        { "name": "minor", "type": "buf_out", "len_fixed": 4 } ] },
+    { "name": "eglTerminate", "ret": "int32",
+      "args": [ { "name": "dpy", "type": "handle" } ] },
+    { "name": "eglGetError", "ret": "int32", "args": [] },
+    { "name": "eglQueryString", "ret": "string",
+      "args": [
+        { "name": "dpy", "type": "handle" },
+        { "name": "name", "type": "uint32" } ] },
+    { "name": "eglCreateWindowSurface", "ret": "handle",
+      "args": [
+        { "name": "dpy", "type": "handle" },
+        { "name": "config", "type": "handle" },
+        { "name": "win", "type": "handle" },
+        { "name": "attrib_list", "type": "buf_in", "len_fixed": 64 } ] },
+    { "name": "eglCreateContext", "ret": "handle",
+      "args": [
+        { "name": "dpy", "type": "handle" },
+        { "name": "config", "type": "handle" },
+        { "name": "share_context", "type": "handle" },
+        { "name": "attrib_list", "type": "buf_in", "len_fixed": 64 } ] },
+    { "name": "eglMakeCurrent", "ret": "int32",
+      "args": [
+        { "name": "dpy", "type": "handle" },
+        { "name": "draw", "type": "handle" },
+        { "name": "read", "type": "handle" },
+        { "name": "ctx", "type": "handle" } ] },
+    { "name": "eglSwapBuffers", "ret": "int32",
+      "args": [
+        { "name": "dpy", "type": "handle" },
+        { "name": "surface", "type": "handle" } ] },
+    { "name": "eglDestroySurface", "ret": "int32",
+      "args": [
+        { "name": "dpy", "type": "handle" },
+        { "name": "surface", "type": "handle" } ] },
+    { "name": "eglDestroyContext", "ret": "int32",
+      "args": [
+        { "name": "dpy", "type": "handle" },
+        { "name": "ctx", "type": "handle" } ] },
+    { "name": "eglGetProcAddress", "ret": "handle",
+      "args": [ { "name": "name", "type": "string" } ] }
+  ]
+}

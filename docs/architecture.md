@@ -11,6 +11,7 @@ Bu belge Triango ARM32 Bridge'in bileşenlerini, exec akışını ve tasarım ka
 | L1 | `triango-bridge` | userspace (AArch64) | ELF doğrulama, argv sözleşmesi çözümü, sysroot32 hazırlama, motor seçimi |
 | L2 | motor (`qemu-arm`, ileride `triango-jit`) | userspace | AArch32 talimatlarını AArch64 üzerinde yürütme |
 | L3 | `module/` (KernelSU/BakaSU) | root modül sistemi | Kurulum, kalıcılık, SELinux, binfmt_misc yedeği, prop yönetimi |
+| GPU | `gpu/` (shim + `triango-gpud`) | userspace (AArch64) | GLES/Vulkan **dişli** mod: arm32 shim → kanal → arm64 sürücü (`docs/gpu-thunking.md`) |
 
 ## 2. Exec akışı / Exec flow
 
@@ -92,13 +93,13 @@ Motor arayüzü (`include/triango/engine.h`): `probe()` + `launch(spec)`. Yeni m
 - Standart Magisk/KernelSU modül düzeni (`module.prop`, `post-fs-data.sh`, `service.sh`, `sepolicy.rule`, `system.prop`, `uninstall.sh`).
 - **LKM jailbreak mode uyumu:** ksud late-load'ta `post-fs-data` geç çalışabilir → `service.sh` idempotent kontrol ile gerekli kurulumu tekrar dener (bayrak dosyası ile çift çalışmayı engeller).
 - `.ko` yükleme: `insmod` (su altında). Vermagic GKI ile eşleşmiyorsa binfmt_misc yedeği kullanılır ve kullanıcı bilgilendirilir.
-- `system.prop` içindeki `ro.product.cpu.abilist32` satırları **varsayılan olarak kapalıdır** (yalnızca yorum satırı) — PackageManager'ı kandırmak kurulumu mümkün kılar ama uygulama düzeyi çalışma (zygote32/ART) v0.3'e kadar desteklenmez.
+- `system.prop` içindeki `ro.product.cpu.abilist32` satırları v0.2 ile **açıktır** (post-fs-data `resetprop` + opt-out: `/data/adb/triango/config/disable_abilist32`) — kurulum sorununu çözer; uygulama düzeyi çalışma (zygote32/ART/NativeBridge) v0.3'e kadardır (`docs/abi-fix.md`).
 
 ## 7. Bilinen sınırlamalar / Known limitations (v0.1)
 
 1. **Performans:** qemu user-mode çevirisi günlük kullanım için yavaştır — JIT motoru bu yüzden yol haritasında.
 2. **Uygulama düzeyi:** APK içindeki arm32 native kod için ART/zygote32 entegrasyonu (libhoudini/ndk_translation benzeri) gerekir; v0.1 yalnızca **doğrudan exec** (shell, termux, oyun konsolu/native binary'ler, test araçları) hedefler.
-3. **32-bit GPU/medya kütüphaneleri:** yalnızca CPU çevirisi yapılır; vendor arm32 HAL yoksa ilgili işlevler çalışmaz.
+3. **32-bit GPU/medya kütüphaneleri:** v0.2'de **dişli mod** (arm32 shim → `triango-gpud` → arm64 sürücü) karşılar — `docs/gpu-thunking.md`; halen eksik girişler ve 32-bit handle jeton-eşleme tablosu yol haritasındadır. Medya (codec) hâlâ kapsam dışıdır.
 4. **vdso32 yok:** 32-bit vdso emüle edilir (qemu kendi vdso'sunu sağlar; JIT `stack.c` ile üretir).
 
 ## 8. Hata modları / Failure modes

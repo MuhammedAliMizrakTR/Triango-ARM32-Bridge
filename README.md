@@ -63,6 +63,7 @@ kernel/triango-bridge-lkm/   Çekirdek LKM — binfmt yakalama (GPL-2.0)
 bridge/                      Kullanıcı alanı köprüsü (AArch64, taşınabilir C)
   src/                       ELF32 yükleyici, syscall tablosu, motor arayüzü
   tests/                     Host üzerinde çalışan birim testleri
+gpu/                         GLES/Vulkan dişli (thunk) katmanı + gpud daemon
 module/                      KernelSU / BakaSU modül paketi (Magisk uyumlu düzen)
 tools/                       Derleme, paketleme, sembol denetimi yardımcıları
 docs/                        Mimari, cihaz profili, BakaSU dağıtım rehberi
@@ -74,13 +75,16 @@ docs/                        Mimari, cihaz profili, BakaSU dağıtım rehberi
 # 1) Kullanıcı alanı köprüsü + birim testleri (herhangi bir Linux host)
 make -C bridge test
 
-# 2) Köprüyü hedefe (aarch64) derle
+# 2) GPU dişli katmanı testleri (protocol + roundtrip + struct_conv)
+make -C gpu test
+
+# 3) Köprüyü hedefe (aarch64) derle
 make -C bridge CROSS_COMPILE=aarch64-linux-gnu- all
 
-# 3) LKM — GKI kaynak ağacı gerekir (CI otomatik derler)
+# 4) LKM — GKI kaynak ağacı gerekir (CI otomatik derler)
 ./kernel/triango-bridge-lkm/build.sh /path/to/kernel-common-android16-6.12
 
-# 4) KernelSU modül zip'i üret
+# 5) KernelSU modül zip'i üret
 ./tools/package-module.sh
 # → dist/triango-arm32-bridge-ksu.zip
 ```
@@ -97,16 +101,37 @@ make -C bridge CROSS_COMPILE=aarch64-linux-gnu- all
 
 Ayrıntılar: [`docs/bakasu-lkm-jailbreak.md`](docs/bakasu-lkm-jailbreak.md)
 
-## Durum / Status (v0.1.0)
+## GPU desteği / GPU support (v0.2)
+
+OpenGL ES ve Vulkan için **iki** çalışma biçimi:
+
+- **Normal:** misafir (arm32) doğrudan yerel sürücü kitaplıklarını kullanır
+  (sysroot32'te arm32 blob varsa).
+- **Dişli (geared):** arm32 shim → paylaşımlı bellek kanalı → `triango-gpud`
+  → arm64 sürücü (Adreno blob **veya** Mesa Turnip Vulkan).
+
+Mimari, protokol, struct-dönüşüm ve bilinen sınırlar:
+[`docs/gpu-thunking.md`](docs/gpu-thunking.md).
+
+## `INSTALL_FAILED_NO_MATCHING_ABIS` (v0.2)
+
+Sistem geneli ABI prop'ları (abilist32) modülle otomatik açılır; tek
+kurulumluk geçici çözüm: `tools/pm-install-arm32.sh`. Ayrıntılar:
+[`docs/abi-fix.md`](docs/abi-fix.md).
+
+## Durum / Status (v0.2-dev)
 
 | Bileşen | Durum |
 |---|---|
 | `triango_bridge.ko` (binfmt yakalama, GKI 6.12 uyumlu) | ✅ kaynak hazır, CI'da derlenir |
 | `triango-bridge` (ELF32 yükleyici, argv sözleşmesi, motor arayüzü) | ✅ + host birim testleri |
 | `qemu-arm` motor entegrasyonu | ✅ argv kurulumu hazır (motor binary'si harici) |
+| GPU dişli katmanı (GLES/Vulkan thunk + protokol + gpud iskeleti) | ✅ `make -C gpu test` (4000+ kontrol) |
+| GPU normal mod (doğrudan arm32 blob geçişi) | ✅ tasarım + sysroot32 yerleşimi hazır |
+| `INSTALL_FAILED_NO_MATCHING_ABIS` çözümü (abilist32) | ✅ modülde (post-fs-data resetprop + system.prop) |
 | Triango JIT motoru (arm32→arm64) | 🚧 iskelet (`docs/roadmap.md`) |
 | KernelSU / BakaSU modül paketi | ✅ |
-| APK/zygote32 (uygulama düzeyi tam destek) | 🗺️ yol haritasında (v0.3) |
+| APK/zygote32 (uygulama düzeyi tam destek, NativeBridge) | 🗺️ yol haritasında (v0.3) |
 
 ## Güvenlik / Safety
 
