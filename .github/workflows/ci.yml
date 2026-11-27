@@ -37,8 +37,19 @@ jobs:
       - name: Fetch & prepare GKI kernel tree
         if: steps.cache-kernel.outputs.cache-hit != 'true'
         run: |
-          git clone --depth=1 -b android16-6.12 \
-            https://android.googlesource.com/kernel/common kernel-common
+          set -e
+          fetch() {
+            rm -rf kernel-common
+            for i in 1 2 3; do
+              git clone --depth=1 -b android16-6.12 "$1" kernel-common && return 0
+              echo "clone attempt $i of $1 failed; retrying..."
+              sleep 5
+            done
+            return 1
+          }
+          # Primary: AOSP; fallback: GitHub mirror (same branch).
+          fetch https://android.googlesource.com/kernel/common \
+            || fetch https://github.com/aosp-mirror/kernel_common
           make -C kernel-common ARCH=arm64 gki_defconfig || make -C kernel-common ARCH=arm64 defconfig
           make -C kernel-common ARCH=arm64 olddefconfig
           make -C kernel-common ARCH=arm64 modules_prepare
