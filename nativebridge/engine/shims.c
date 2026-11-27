@@ -378,6 +378,29 @@ static uint64_t sh_aeabi_idiv(uint64_t a, uint64_t b, uint64_t z, uint64_t z2)
 	return (uint64_t)(uint32_t)(y == 0 ? 0 : x / y);
 }
 
+static uint64_t sh_aeabi_uidivmod(uint64_t a, uint64_t b, uint64_t z,
+				  uint64_t z2)
+{
+	uint32_t q = b ? (uint32_t)a / (uint32_t)b : 0;
+	uint32_t r = b ? (uint32_t)a % (uint32_t)b : (uint32_t)a;
+
+	(void)z;
+	(void)z2;
+	return ((uint64_t)r << 32) | q;
+}
+
+static uint64_t sh_aeabi_idivmod(uint64_t a, uint64_t b, uint64_t z,
+				 uint64_t z2)
+{
+	int32_t x = (int32_t)a, y = (int32_t)b;
+	int32_t q = y ? x / y : 0;
+	int32_t r = y ? x % y : x;
+
+	(void)z;
+	(void)z2;
+	return ((uint64_t)(uint32_t)r << 32) | (uint32_t)q;
+}
+
 static uint64_t sh_aeabi_memclr(uint64_t d, uint64_t n, uint64_t z, uint64_t z2)
 {
 	return sh_memset(d, 0, n, 0);
@@ -420,6 +443,9 @@ void t32_shim_install_builtins(t32_space *sp)
 	t32_shim_install(sp, "labs", sh_abs);
 	t32_shim_install(sp, "__aeabi_uidiv", sh_aeabi_uidiv);
 	t32_shim_install(sp, "__aeabi_idiv", sh_aeabi_idiv);
+	t32_shim_install(sp, "__aeabi_uidivmod", sh_aeabi_uidivmod);
+	t32_shim_install(sp, "__aeabi_idivmod", sh_aeabi_idivmod);
+	t32_shim_install(sp, "__stack_chk_fail", sh_abort);
 	t32_shim_install(sp, "__aeabi_memclr", sh_aeabi_memclr);
 	t32_shim_install(sp, "__aeabi_memclr4", sh_aeabi_memclr);
 	t32_shim_install(sp, "__aeabi_memclr8", sh_aeabi_memclr);

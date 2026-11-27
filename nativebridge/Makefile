@@ -57,11 +57,12 @@ ifeq ($(ARM_CC),)
 	@echo "skip guest_fns.so (no arm-linux-gnueabi-gcc)"
 	@touch $@
 else
-	$(ARM_CC) -shared -fPIC -O2 -o $@ engine/tests/guest_fns.c
+	$(ARM_CC) -shared -fPIC -O2 -fno-stack-protector -fno-builtin \
+		-Wl,--hash-style=sysv -o $@ engine/tests/guest_fns.c
 endif
 
 engine-test: $(BUILD)/test_engine $(BUILD)/guest_fns.so
-	@if file $(BUILD)/guest_fns.so | grep -q ELF; then \
+	@if [ -n "$(ARM_CC)" ] && [ -s $(BUILD)/guest_fns.so ]; then \
 		TRIANGO_TEST_SO=$(BUILD)/guest_fns.so ./$(BUILD)/test_engine; \
 	else \
 		./$(BUILD)/test_engine; \

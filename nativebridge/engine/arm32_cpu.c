@@ -1618,7 +1618,10 @@ uint32_t t32_call(t32_cpu *c, t32_space *mem, uint32_t fn,
 		if (sf) {
 			uint64_t rv = sf(c->r[0], c->r[1], c->r[2], c->r[3]);
 
+			/* AAPCS: r0 = low half; r1 = high half (caller-saved,
+			 * used by __aeabi_*divmod for the remainder) */
 			c->r[0] = (uint32_t)rv;
+			c->r[1] = (uint32_t)(rv >> 32);
 			pc = c->r[14];
 			if ((pc & 1u) && pc != T32_LR_SENTINEL) {
 				c->cpsr |= T32_CPSR_T;
