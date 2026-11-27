@@ -1,15 +1,18 @@
 #!/system/bin/sh
 # SPDX-License-Identifier: MIT
-# Triango ARM32 Bridge — soft-reboot activator (v1.0).
+# Triango ARM32 Bridge — soft-reboot activator (v1.2.1-b).
 #
 #   su -c /data/adb/modules/triango_arm32_bridge/activate.sh [--no-restart]
 #
-# Activates (or re-activates) the Triango stack WITHOUT a full reboot:
-#   1. props (abilist + native.bridge) via resetprop
-#   2. linkerconfig permission for /data/adb/triango/lib
-#   3. zygote restart ("soft reboot") unless --no-restart
-#
-# Called from the WebUI's "Aktive Et" button and manually from a root shell.
+# Activates (or re-activates) the Triango stack WITHOUT a full reboot.
+# v1.2.1-b: ro.dalvik.vm.native.bridge is assigned ONLY here (and in
+# service.sh) and only after all 4 readiness preconditions pass:
+#   (a) bridge + engine .so staged under /data/adb/triango/lib
+#   (b) permissions 0755 (dirs) / 0644 (.so)
+#   (c) chcon u:object_r:system_file:s0 on the lib dir succeeded
+#   (d) linkerconfig namespace knows /data/adb/triango/lib
+# Anything less and the activation is cancelled — zygote must never see
+# the prop before the libraries are loadable.
 MODDIR=${0%/*}
 TRI=/data/adb/triango
 
@@ -32,6 +35,17 @@ if [ -z "$RESETPROP" ]; then
 	exit 1
 fi
 
+if [ -f "$TRI/config/safe_mode" ]; then
+	log "SAFE MODE active ($TRI/config/safe_mode) — activation cancelled"
+	exit 1
+fi
+
+# 0. Permissions (Fix 1) — 0755 dirs, 0644 .so.
+chmod 755 "$TRI" "$TRI/lib" 2>/dev/null
+for so in "$TRI/lib"/*.so; do
+	[ -f "$so" ] && chmod 644 "$so" 2>/dev/null
+done
+
 # 1. Stage the bridge library (latest build wins).
 mkdir -p "$TRI/lib" "$TRI/log" "$TRI/config"
 if [ ! -f "$TRI/config/disable_nativebridge" ]; then
@@ -44,7 +58,7 @@ if [ ! -f "$TRI/config/disable_nativebridge" ]; then
 		fi
 	done
 
-	# 1b. Stage the interpreter engine plug-in (V1.1(a)).
+	# 1b. Stage the interpreter engine plug-in.
 	for f in "$MODDIR/libtriango_nb_engine.so" \
 		"$MODDIR/system/lib64/libtriango_nb_engine.so"; do
 		if [ -f "$f" ]; then
@@ -55,7 +69,18 @@ if [ ! -f "$TRI/config/disable_nativebridge" ]; then
 		fi
 	done
 
-	# 2. Linker namespace permission (idempotent).
+	# 2. SELinux label (Fix 2) — zygote dlopen requires system_file.
+	#    Failure cancels the activation entirely.
+	if chcon -R u:object_r:system_file:s0 "$TRI/lib" 2>/dev/null; then
+		rm -f "$TRI/log/chcon_failed" 2>/dev/null
+		log "lib relabeled system_file"
+	else
+		touch "$TRI/log/chcon_failed" 2>/dev/null
+		log "ERROR: chcon system_file failed — native.bridge activation cancelled"
+		exit 1
+	fi
+
+	# 3. Linker namespace permission (idempotent) — precondition (d).
 	LC=/linkerconfig/ld.config.txt
 	if [ -f "$LC" ] && ! grep -q "data/adb/triango/lib" "$LC" 2>/dev/null; then
 		sed -i 's#namespace.default.search.paths = #namespace.default.search.paths = /data/adb/triango/lib: #' "$LC" 2>/dev/null
@@ -63,18 +88,27 @@ if [ ! -f "$TRI/config/disable_nativebridge" ]; then
 		log "linkerconfig patched"
 	fi
 
-	# 3. Native bridge prop (absolute path preferred).
-	if [ -f "$TRI/lib/libtriango_native_bridge.so" ]; then
+	# 4. Readiness preconditions before the prop goes live.
+	ok=1
+	[ -f "$TRI/lib/libtriango_native_bridge.so" ] || ok=0
+	[ -f "$TRI/lib/libtriango_nb_engine.so" ] || log "WARN: engine .so not staged (bridge will report no-engine)"
+	[ -d "$TRI/lib" ] || ok=0
+	[ -f "$TRI/log/chcon_failed" ] && ok=0
+	grep -q "data/adb/triango/lib" /linkerconfig/ld.config.txt 2>/dev/null || {
+		[ -f /linkerconfig/ld.config.txt ] && ok=0
+	}
+	if [ "$ok" = 1 ]; then
+		# Native bridge prop (absolute path preferred).
 		"$RESETPROP" ro.dalvik.vm.native.bridge \
 			"$TRI/lib/libtriango_native_bridge.so" 2>/dev/null
+		log "native.bridge armed: $TRI/lib/libtriango_native_bridge.so"
 	else
-		"$RESETPROP" ro.dalvik.vm.native.bridge \
-			"libtriango_native_bridge.so" 2>/dev/null
-		log "WARN: bridge .so not staged (build with tools/build-nativebridge.sh)"
+		log "ERROR: readiness preconditions failed — native.bridge NOT set"
+		exit 1
 	fi
 fi
 
-# 4. ABI props.
+# 5. ABI + ART ISA props (Fix 3).
 if [ ! -f "$TRI/config/disable_abilist32" ]; then
 	"$RESETPROP" ro.product.cpu.abilist "arm64-v8a,armeabi-v7a,armeabi" 2>/dev/null
 	"$RESETPROP" ro.product.cpu.abilist32 "armeabi-v7a,armeabi" 2>/dev/null
@@ -82,13 +116,17 @@ if [ ! -f "$TRI/config/disable_abilist32" ]; then
 	"$RESETPROP" ro.vendor.product.cpu.abilist "arm64-v8a,armeabi-v7a,armeabi" 2>/dev/null
 	"$RESETPROP" ro.vendor.product.cpu.abilist32 "armeabi-v7a,armeabi" 2>/dev/null
 fi
+"$RESETPROP" ro.dalvik.vm.isa.arm "arm64" 2>/dev/null
+"$RESETPROP" ro.dalvik.vm.isa.arm.variant "generic" 2>/dev/null
+"$RESETPROP" ro.dalvik.vm.isa.arm.features "default" 2>/dev/null
+"$RESETPROP" ro.enable.native.bridge.exec "1" 2>/dev/null
 
 if [ "$1" = "--no-restart" ]; then
 	log "props applied (zygote restart skipped)"
 	exit 0
 fi
 
-# 5. Soft reboot: restart the Android framework so zygote re-reads props.
+# 6. Soft reboot: restart the Android framework so zygote re-reads props.
 log "soft reboot: restarting zygote"
 setprop ctl.restart zygote 2>/dev/null
 setprop ctl.restart zygote_secondary 2>/dev/null

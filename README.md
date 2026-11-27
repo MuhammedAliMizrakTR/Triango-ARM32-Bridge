@@ -127,13 +127,14 @@ eklentisi** `libtriango_nb_engine.so` + KSU modülü: **LateLoad uyumlu**,
 WebUI** (durum kartları, tek dokunuşla aktivasyon, günlük görüntüleyici).
 Ayrıntılar: [`docs/nativebridge.md`](docs/nativebridge.md).
 
-**Dürüstlük notu (V1.1(a)):** motor, arm32 ARM/Thumb-2 komutlarını
-**yorumlayıcı** ile çalıştırır — libc içe aktarımları (memcpy, malloc,
-strlen, __aeabi_*) **host üzerinde native hızda** koşar; uygulama kodu
-çeviri öncesi hızdadır. **Gerçek native hız (JIT)** bir sonraki adımdır.
-VFP/NEON ve SVC çağruları bilinçli boşluklardır (tanılama ile raporlanır).
+**Dürüstlük notu (v1.2.1-b):** motor, arm32 ARM/Thumb-2 komut setini
+**blok JIT** ile yerel hıza çevirir (x64/AArch64 backend); kapsama dışı
+komutlar tek adımlık **yorumlayıcı düşüşü** ile çalışır (semantik tek
+kaynak: yorumlayıcı). VFP/NEON bu sürümde **yorumlayıcı** üzerinden tam
+desteklidir (JIT'e alınması sonraki adımdır). libc shim'leri host üzerinde
+native hızdadır.
 
-## Durum / Status (v1.1.0-a)
+## Durum / Status (v1.2.1-b)
 
 | Bileşen | Durum |
 |---|---|
@@ -142,11 +143,12 @@ VFP/NEON ve SVC çağruları bilinçli boşluklardır (tanılama ile raporlanır
 | `qemu-arm` motor entegrasyonu | ✅ argv kurulumu hazır (motor binary'si harici) |
 | GPU dişli katmanı (thunk üretici + protokol + jeton tablosu + gpud) | ✅ `make -C gpu test` (4098 kontrol) |
 | GPU normal mod (doğrudan arm32 blob geçişi) | ✅ tasarım + sysroot32 yerleşimi hazır |
-| `INSTALL_FAILED_NO_MATCHING_ABIS` çözümü (abilist32) | ✅ modülde (post-fs-data resetprop + system.prop) |
-| NativeBridge (libtriango_native_bridge, v6 arayüz + WebUI + soft reboot) | ✅ v1.1(a) |
-| **Motor eklentisi** (`libtriango_nb_engine.so`: ARM/Thumb-2 yorumlayıcı + ELF32 yükleyici + host trambolin + libc shim'leri) | ✅ V1.1(a) — 30 test |
-| KernelSU / BakaSU modül paketi (WebUI'li) | ✅ v1.1.0-a |
-| Triango JIT motoru (arm32→arm64, native hız) | 🚧 sonraki adım (`docs/roadmap.md`) |
+| `INSTALL_FAILED_NO_MATCHING_ABIS` çözümü (abilist32) | ✅ kurulum anında + her boot (doğrudan paket yükleyici) |
+| NativeBridge (libtriango_native_bridge, v6 arayüz + WebUI + soft reboot) | ✅ zygote-güvenli (gecikmeli aktivasyon, lazy init) |
+| **Motor eklentisi** (`libtriango_nb_engine.so`: ARM/Thumb-2 **JIT** + yorumlayıcı + VFP/NEON + ELF32 + trambolin + shim'ler) | ✅ 110/110 test (JIT + yorumlayıcı diferansiyel) |
+| KernelSU / BakaSU modül paketi (WebUI'li) | ✅ v1.2.1-b |
+| Triango JIT motoru (arm32→yerel blok çevirici) | ✅ v1.2.0-b (x64 + AArch64 backend) |
+| zygote64 soft-reboot çökme düzeltmeleri (izin/etiket/ISA prop/gecikmeli aktivasyon) | ✅ v1.2.1-b hotfix |
 
 ## Güvenlik / Safety
 
